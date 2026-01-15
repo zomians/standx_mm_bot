@@ -1,0 +1,17 @@
+# Environment (NEVER COMMIT)
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# OS
+.DS_Store
