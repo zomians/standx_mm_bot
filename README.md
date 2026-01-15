@@ -2,7 +2,7 @@
 
 StandX の Maker Points / Maker Uptime を最大化するための Market Making Bot。
 
-**目的**: トレードで勝つことではなく、**条件を満たし続けること**を自動化する。
+**目的**: **約定させずに板に居続けること**を自動化する。
 
 ---
 
@@ -14,6 +14,20 @@ StandX は「板に居続けること」に報酬が出る Perp DEX。このBot�
 |----------------|------|-----------|
 | **Maker Points** | 板上に3秒以上、mark_price ± 10bps 以内で 100% | 距離を維持し続ける |
 | **Maker Uptime** | 毎時間30分以上、両サイド ± 10bps 以内 | 空白時間ゼロで板に居続ける |
+
+### 設計思想
+
+```
+約定 = 失敗
+```
+
+| 項目 | 方針 |
+|------|------|
+| 約定 | **しない**（手数料ゼロ、FRリスクゼロ） |
+| 建玉 | **持たない**（清算リスクゼロ） |
+| 距離 | 10bps以内だが約定しない位置 |
+
+価格が近づいてきたら → **逃げる**（キャンセル or 外側に移動）
 
 ---
 
@@ -37,7 +51,7 @@ StandX は「板に居続けること」に報酬が出る Perp DEX。このBot�
 
 ```bash
 # リポジトリクローン
-git clone https://github.com/your-repo/standx_mm_bot.git
+git clone https://github.com/zomians/standx_mm_bot.git
 cd standx_mm_bot
 
 # 仮想環境作成
@@ -66,7 +80,7 @@ STANDX_CHAIN=bsc              # bsc or solana
 SYMBOL=ETH_USDC               # 取引ペア
 TARGET_DISTANCE_BPS=8         # 目標距離 (bps)
 ORDER_SIZE=0.1                # 片側注文サイズ
-MAX_NET_POSITION=0.5          # 最大ネットポジション
+ESCAPE_THRESHOLD_BPS=3        # この距離まで近づいたら逃げる
 ```
 
 ### 3. 起動
@@ -96,14 +110,13 @@ standx_mm_bot/
 │       │   └── websocket.py   # WebSocket クライアント
 │       ├── core/
 │       │   ├── order.py       # 注文管理
-│       │   ├── position.py    # ポジション管理
-│       │   └── risk.py        # リスク制御
+│       │   └── escape.py      # 約定回避ロジック
 │       └── strategy/
 │           └── maker.py       # Maker戦略ロジック
 ├── tests/
 │   ├── test_auth.py
 │   ├── test_order.py
-│   └── test_websocket.py
+│   └── test_escape.py
 ├── .env.example
 ├── .gitignore
 ├── pyproject.toml
@@ -164,13 +177,19 @@ gh pr create --title "タイトル" --body "Closes #XX"
 | symbol | `SYMBOL` | `ETH_USDC` | 取引ペア |
 | target_distance_bps | `TARGET_DISTANCE_BPS` | `8` | 目標距離 (10bps境界から2bps内側) |
 | order_size | `ORDER_SIZE` | `0.1` | 片側注文サイズ |
-| max_net_position | `MAX_NET_POSITION` | `0.5` | ネットポジション上限 |
+
+### 約定回避設定
+
+| パラメータ | 環境変数 | デフォルト | 説明 |
+|-----------|----------|-----------|------|
+| escape_threshold_bps | `ESCAPE_THRESHOLD_BPS` | `3` | 価格がこの距離まで近づいたら逃げる |
+| outer_escape_distance_bps | `OUTER_ESCAPE_DISTANCE_BPS` | `15` | 逃げる先の距離 |
 
 ### 再配置トリガー
 
 | パラメータ | 環境変数 | デフォルト | 説明 |
 |-----------|----------|-----------|------|
-| reposition_threshold_bps | `REPOSITION_THRESHOLD_BPS` | `2` | この距離で再配置開始 |
+| reposition_threshold_bps | `REPOSITION_THRESHOLD_BPS` | `2` | 10bps境界に近づいたら再配置 |
 | price_move_threshold_bps | `PRICE_MOVE_THRESHOLD_BPS` | `5` | 価格変動トリガー |
 
 ### 接続設定
@@ -199,7 +218,6 @@ WebSocket: wss://perps.standx.com/ws-stream/v1
 | 注文発注 | POST | `/api/new_order` |
 | 注文キャンセル | POST | `/api/cancel_order` |
 | 未決注文一覧 | GET | `/api/query_open_orders` |
-| ポジション取得 | GET | `/api/query_positions` |
 
 ### WebSocket チャンネル
 
@@ -207,7 +225,7 @@ WebSocket: wss://perps.standx.com/ws-stream/v1
 |-----------|------|------|
 | `price` | 不要 | mark_price リアルタイム |
 | `order` | 必要 | 注文状態変化 |
-| `position` | 必要 | ポジション変化 |
+| `depth_book` | 不要 | 板情報（約定回避判断用） |
 
 ---
 
@@ -223,7 +241,7 @@ WebSocket: wss://perps.standx.com/ws-stream/v1
 
 **計算式**: `points = notional × multiplier × time / 86400`
 
-**要件**: 板上に **3秒以上** 存在
+**要件**: 板上に **3秒以上** 存在（約定不要）
 
 ### Maker Uptime
 
@@ -234,6 +252,36 @@ WebSocket: wss://perps.standx.com/ws-stream/v1
 | 時間 | 毎時間 30分以上 |
 | Boosted Tier | 70%以上稼働で 1.0x |
 | Standard Tier | 50%以上稼働で 0.5x |
+
+---
+
+## Bot ロジック
+
+### 基本フロー
+
+```
+1. 両サイドに指値注文を配置（mark_price ± 8bps）
+2. 価格を監視
+3. 価格が近づいてきたら → 逃げる
+4. 価格が離れたら → 戻る
+5. 10bps境界を超えそうなら → 再配置
+```
+
+### 約定回避ロジック
+
+```
+価格が注文に近づく（3bps以内）
+  ↓
+即座にキャンセル or 外側（15bps）に移動
+  ↓
+価格が離れたら元の位置（8bps）に戻る
+```
+
+### 優先順位
+
+1. **約定回避** — 最優先。建玉を持たない
+2. **10bps維持** — Uptime条件を満たす
+3. **空白時間最小化** — 板に常に存在
 
 ---
 
@@ -260,6 +308,20 @@ Warning: WebSocket disconnected, reconnecting...
 - 自動再接続を待つ (デフォルト5秒間隔)
 - ネットワーク接続を確認
 
+### 意図せず約定した場合
+
+```
+Warning: Order filled unexpectedly
+```
+
+**原因**:
+- 急激な価格変動で逃げが間に合わなかった
+- WebSocket遅延
+
+**対処**:
+- `ESCAPE_THRESHOLD_BPS` を大きくする（早めに逃げる）
+- 建玉が発生した場合は手動でクローズ
+
 ### 注文が通らない
 
 ```
@@ -270,16 +332,6 @@ Error: Order rejected
 1. 残高確認: `GET /api/query_balance`
 2. 価格が mark_price から離れすぎていないか確認
 3. 注文サイズが最小単位を満たしているか確認
-
-### ポジション偏り警告
-
-```
-Warning: Net position exceeded limit
-```
-
-**対処**:
-- 自動で片側注文が停止される
-- 手動でポジションを調整するか、設定の `MAX_NET_POSITION` を見直す
 
 ---
 
