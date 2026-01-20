@@ -358,6 +358,14 @@ Error: Order rejected
 
 ## 参考リンク
 
+### プロジェクト内ドキュメント
+
+- [GUIDE.md](./GUIDE.md) - 理論的背景・技術基礎・設計思想の教科書的解説
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - 開発規約・ワークフロー
+- [CLAUDE.md](./CLAUDE.md) - AI 向けクイックリファレンス
+
+### StandX 関連
+
 - [StandX API Docs](https://docs.standx.com/standx-api/standx-api)
 - [Maker Uptime Program](https://docs.standx.com/docs/stand-x-campaigns/market-maker-uptime-program)
 - [Mainnet Campaigns](https://docs.standx.com/docs/stand-x-campaigns/mainnet-campaigns)
