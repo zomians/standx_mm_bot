@@ -787,6 +787,82 @@ logger.info(f"Wallet: {address[:6]}...{address[-4:]}")
 logger.info(f"Private key: {private_key}")
 ```
 
+### パフォーマンスチェック
+
+Bot は長時間稼働が前提のため、以下を確認してください：
+
+#### 1. WebSocket メッセージ処理
+
+**✅ DO**: 非同期処理を適切に使用
+
+```python
+async def on_message(self, message: dict) -> None:
+    await self.process_message(message)  # ブロックしない
+```
+
+**❌ DON'T**: 同期処理でブロック
+
+```python
+def on_message(self, message: dict) -> None:
+    time.sleep(1)  # イベントループをブロック
+```
+
+#### 2. API 呼び出し頻度
+
+**✅ DO**: レート制限を考慮
+
+```python
+# 必要最小限の呼び出し
+if distance_bps > THRESHOLD:
+    await cancel_order(order_id)
+```
+
+**❌ DON'T**: 過度な API 呼び出し
+
+```python
+# 毎秒呼び出し（不要）
+while True:
+    await get_all_orders()
+    await asyncio.sleep(1)
+```
+
+#### 3. メモリリーク防止
+
+**✅ DO**: 不要なデータを削除
+
+```python
+completed_orders = []
+for order in completed_orders[:]:  # コピーをイテレート
+    if order.is_old():
+        completed_orders.remove(order)
+```
+
+**❌ DON'T**: 無限に蓄積
+
+```python
+all_messages = []  # 永遠に増え続ける
+async def on_message(msg):
+    all_messages.append(msg)  # メモリリーク
+```
+
+#### 4. 非同期処理のブロッキング回避
+
+**✅ DO**: CPU バウンドな処理は分離
+
+```python
+import asyncio
+
+result = await asyncio.to_thread(heavy_calculation, data)
+```
+
+**❌ DON'T**: イベントループで重い処理
+
+```python
+async def process():
+    for i in range(1_000_000):  # イベントループをブロック
+        calculate(i)
+```
+
 ### リスク制御チェック
 
 Bot 特有のチェック項目：
