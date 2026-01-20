@@ -115,41 +115,118 @@ fix(escape): 約定回避ロジックを修正 (issue#3)
 
 ---
 
-## 開発ワークフロー
+## CONTRIBUTING.md 活用方法
+
+開発作業の流れは CONTRIBUTING.md に詳細に記載されています。
+
+### 開発ワークフロー（5 ステップ）
 
 ```bash
-# 1. ブランチ作成
-git checkout main && git pull
+# 1. Issue 作成（GitHub で実施）
+# → CONTRIBUTING.md の「Issue 作成ガイドライン」参照
+
+# 2. ブランチ作成
+git checkout main && git pull origin main
 git checkout -b feature/XX-description
 
-# 2. 実装・テスト
+# 3. 実装
+# → CONTRIBUTING.md の「コーディング規約」参照
 
-# 3. コミット
+# 4. コミット
 git add .
-git commit -m "feat(scope): 内容 (issue#XX)"
+git commit -m "feat(scope): 変更内容 (issue#XX)"
 
-# 4. PR作成
+# 5. PR 作成
 gh pr create --title "タイトル" --body "Closes #XX"
+```
+
+### コミット規約
+
+```bash
+# フォーマット
+<type>(<scope>): <subject> (issue#XX)
+
+# 例
+feat(ws): WebSocket接続を実装 (issue#2)
+fix(escape): 約定回避ロジックを修正 (issue#3)
+docs: CONTRIBUTING.mdを追加 (issue#4)
+```
+
+**Scope**: `auth`, `ws`, `order`, `escape`, `config`, `docs`
+
+**禁止事項**:
+
+- ❌ main ブランチへの直接プッシュ
+- ❌ issue 番号なしのコミット
+- ❌ AI ツール署名の追加（`Co-Authored-By: Claude` など）
+
+---
+
+## 重要な設計原則（プロジェクト固有）
+
+### 1. 約定回避が最優先
+
+```python
+# ✅ GOOD: 価格が近づいたら即座にキャンセル
+if distance_to_order < ESCAPE_THRESHOLD_BPS:  # 3bps
+    await cancel_order(order_id)
+
+# ❌ BAD: 約定を許容
+if distance_to_order < 1:  # 遅すぎる
+    await cancel_order(order_id)
+```
+
+### 2. 建玉ゼロ維持
+
+```python
+# ✅ GOOD: 約定検知時は即クローズ
+if order.status == "FILLED":
+    await close_position_immediately()
+
+# ❌ BAD: 建玉を放置
+if order.status == "FILLED":
+    logger.warning("Filled")  # 何もしない
+```
+
+### 3. 空白時間最小化
+
+```python
+# ✅ GOOD: 新規注文発注 → 確認後、旧注文キャンセル
+new_order = await place_order(new_price)
+if new_order.status == "OPEN":
+    await cancel_order(old_order_id)
+
+# ❌ BAD: キャンセル → 発注（板から消える時間が発生）
+await cancel_order(old_order_id)
+await place_order(new_price)
 ```
 
 ---
 
-## セキュリティ注意事項
+## セキュリティチェック
+
+実装時に以下を確認してください：
 
 ```python
-# DO: 環境変数から取得
+# 1. 秘密鍵管理
+# ✅ DO: 環境変数から取得
 import os
 PRIVATE_KEY = os.environ["STANDX_PRIVATE_KEY"]
 
-# DON'T: ハードコード
-PRIVATE_KEY = "0x1234..."  # NG
+# ❌ DON'T: ハードコード
+PRIVATE_KEY = "0x1234..."  # 絶対NG
 
-# DON'T: ログ出力
-logger.info(f"Key: {private_key}")  # NG
+# 2. ログ出力の注意
+# ✅ DO: 秘密情報をマスク
+logger.info(f"Wallet: {address[:6]}...{address[-4:]}")
+
+# ❌ DON'T: 秘密情報をそのまま出力
+logger.info(f"Private key: {private_key}")  # 絶対NG
+
+# 3. .env ファイルの管理
+# - .env は絶対にコミットしない
+# - .gitignore に追加されていることを確認
 ```
-
-- `.env` は絶対にコミットしない
-- 秘密鍵、APIキーはログに出力しない
 
 ---
 
@@ -225,8 +302,77 @@ if distance_to_order > RETURN_THRESHOLD_BPS:
 
 ---
 
+## Claude Code 向けワークフロー
+
+### 推奨プロンプト形式
+
+```
+issue#XX の [タスク内容] を実装してください。
+
+要件:
+- [要件1]
+- [要件2]
+```
+
+### 作業手順
+
+1. **Issue 確認**: `gh issue view XX`
+2. **ブランチ作成**: `git checkout -b feature/XX-description`
+3. **実装**: コーディング規約に従う
+4. **テスト追加**: pytest でテスト作成
+5. **コミット**: Conventional Commits 形式
+6. **PR 作成**: `gh pr create`
+
+---
+
+## 自動実行ポリシー
+
+Claude Code が操作を実行する際の基準を定義します。
+
+### 確認なしで実行可能
+
+以下の**読み取り専用操作**は、確認なしで自動実行できます：
+
+- **ファイル読み取り**: Read, Grep, Glob
+- **状態確認コマンド**:
+  - `git status`, `git log`, `git diff`
+  - `ls`, `cat`, `grep`, `find`
+- **テスト実行**:
+  - `pytest`
+  - `make test`
+- **型チェック・Lint**:
+  - `mypy .`
+  - `ruff check .`
+
+### 必ず確認が必要
+
+以下の**書き込み・変更操作**は、ユーザーの明示的な承認が必要です：
+
+- **Git 操作**:
+  - `git commit`, `git push`
+  - `git branch` 作成・削除
+  - `git merge`, `git rebase`
+- **ファイル削除・上書き**:
+  - Write, Edit（既存ファイルの上書き）
+  - `rm`, `mv`（ファイル削除・移動）
+- **依存関係の変更**:
+  - `pip install`
+  - `pyproject.toml` の変更
+- **本番環境への操作**:
+  - デプロイコマンド
+  - 環境変数の変更
+  - 本番APIへのアクセス
+
+**原則**: データの永続的な変更や、元に戻せない操作は必ず確認する。
+
+---
+
 ## 関連リンク
 
-- [README.md](./README.md)
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [README.md](./README.md) - プロジェクト概要、クイックスタート
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - 開発規約の詳細
 - [StandX API Docs](https://docs.standx.com/standx-api/standx-api)
+
+---
+
+**Last Updated**: 2026-01-20
