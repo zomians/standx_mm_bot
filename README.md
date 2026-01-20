@@ -361,6 +361,7 @@ Error: Order rejected
 ### プロジェクト内ドキュメント
 
 - [GUIDE.md](./GUIDE.md) - 理論的背景・技術基礎・設計思想の教科書的解説
+- [DESIGN.md](./DESIGN.md) - Bot 実装設計書（アーキテクチャ・実装フェーズ・判断ロジック）
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - 開発規約・ワークフロー
 - [CLAUDE.md](./CLAUDE.md) - AI 向けクイックリファレンス
 

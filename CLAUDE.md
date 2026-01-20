@@ -12,6 +12,7 @@ Claude 向けクイックリファレンス。
 | **CONTRIBUTING.md** | 開発規約（Issue、Git、コミット、PR、コーディング規約） |
 | **CLAUDE.md**       | AI 向けクイックリファレンス（このファイル）            |
 | **GUIDE.md**        | 理論的背景・技術基礎・設計思想の教科書的解説           |
+| **DESIGN.md**       | Bot 実装設計書（アーキテクチャ・実装フェーズ・判断ロジック） |
 
 **詳細な開発規約は [CONTRIBUTING.md](./CONTRIBUTING.md) を参照。**
 
