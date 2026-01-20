@@ -11,6 +11,7 @@ Claude 向けクイックリファレンス。
 | **README.md**       | プロジェクト概要、技術スタック、クイックスタート、トラブルシューティング |
 | **CONTRIBUTING.md** | 開発規約（Issue、Git、コミット、PR、コーディング規約） |
 | **CLAUDE.md**       | AI 向けクイックリファレンス（このファイル）            |
+| **GUIDE.md**        | 理論的背景・技術基礎・設計思想の教科書的解説           |
 
 **詳細な開発規約は [CONTRIBUTING.md](./CONTRIBUTING.md) を参照。**
 
