@@ -26,7 +26,9 @@ async def test_real_api_order_crud(real_config: Settings) -> None:
             # cross_available（利用可能額）をチェック
             available = float(balance_response.get("cross_available", 0))
             if available < 1.0:  # 最低$1必要
-                pytest.skip(f"Insufficient balance: ${available:.2f} (need at least $1.00 for testing)")
+                pytest.skip(
+                    f"Insufficient balance: ${available:.2f} (need at least $1.00 for testing)"
+                )
         except Exception as e:
             pytest.skip(f"Cannot check balance: {e}")
 

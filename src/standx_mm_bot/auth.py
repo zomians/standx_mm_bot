@@ -141,10 +141,7 @@ def generate_request_signature(
 
     # payloadを構築（辞書の挿入順序を保持）
     # StandX APIは辞書の挿入順序を期待している可能性があるため、sort_keysは使用しない
-    if method.upper() == "POST" and body:
-        payload = json.dumps(body, separators=(",", ":"))
-    else:
-        payload = ""
+    payload = json.dumps(body, separators=(",", ":")) if method.upper() == "POST" and body else ""
 
     # 署名メッセージ: "{version},{id},{timestamp},{payload}"
     sign_message_str = f"{version},{request_id},{timestamp},{payload}"
