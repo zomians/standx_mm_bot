@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     # 認証
     standx_private_key: str = Field(..., description="ウォレット秘密鍵")
     standx_wallet_address: str = Field(..., description="ウォレットアドレス")
-    standx_chain: str = Field("solana", description="チェーン (bsc or solana)")
+    standx_chain: str = Field("bsc", description="チェーン (bsc or solana)")
+    standx_request_signing_key: str | None = Field(
+        None, description="APIリクエスト署名用Ed25519秘密鍵（BSC専用、Solanaはウォレット鍵を使用）"
+    )
 
     # 取引設定
     symbol: str = Field("ETH-USD", description="取引ペア")

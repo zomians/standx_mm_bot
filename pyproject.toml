@@ -18,6 +18,8 @@ dependencies = [
     "cryptography>=41.0",
     "python-dotenv>=1.0",
     "rich>=13.0",
+    "base58>=2.1",
+    "eth-account>=0.13.0",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +30,6 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.2",
     "aioresponses>=0.7",
-    "base58>=2.1",
 ]
 
 [project.scripts]
@@ -70,7 +71,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["aiohttp.*", "websockets.*", "nacl.*", "jwt.*"]
+module = ["aiohttp.*", "websockets.*", "nacl.*", "jwt.*", "eth_account.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -24,6 +24,12 @@ SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
 # USDC Mint Address (Solana mainnet)
 USDC_MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
+# BSC RPC エンドポイント（メインネット）
+BSC_RPC_URL = "https://bsc-dataseed.binance.org/"
+
+# USDC Contract Address (BSC mainnet - Binance-Peg BSC-USD)
+BSC_USDC_CONTRACT = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+
 
 async def get_price(client: StandXHTTPClient, symbol: str) -> None:
     """価格情報を取得して表示."""
@@ -205,7 +211,60 @@ async def get_solana_balance(wallet_address: str) -> dict[str, Any]:
     }
 
 
-async def get_balance(client: StandXHTTPClient, wallet_address: str) -> None:
+async def get_bsc_balance(wallet_address: str) -> dict[str, Any]:
+    """
+    BSCウォレットの残高を取得.
+
+    Args:
+        wallet_address: ウォレットアドレス（0x形式）
+
+    Returns:
+        dict: BNB残高とUSDC残高
+    """
+    async with aiohttp.ClientSession() as session:
+        # BNB残高取得
+        bnb_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_getBalance",
+            "params": [wallet_address, "latest"]
+        }
+        async with session.post(BSC_RPC_URL, json=bnb_payload) as response:
+            bnb_result = await response.json()
+            bnb_hex = bnb_result.get("result", "0x0")
+            bnb_balance = int(bnb_hex, 16) / 1e18  # Wei to BNB
+
+        # USDC残高取得（ERC-20 balanceOf）
+        # balanceOf(address) のシグネチャ: 0x70a08231
+        balance_of_signature = "0x70a08231"
+        # アドレスを32バイトにパディング
+        padded_address = wallet_address[2:].zfill(64)
+        data = balance_of_signature + padded_address
+
+        usdc_payload = {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "eth_call",
+            "params": [
+                {
+                    "to": BSC_USDC_CONTRACT,
+                    "data": data
+                },
+                "latest"
+            ]
+        }
+        async with session.post(BSC_RPC_URL, json=usdc_payload) as response:
+            usdc_result = await response.json()
+            usdc_hex = usdc_result.get("result", "0x0")
+            usdc_balance = int(usdc_hex, 16) / 1e18  # USDC decimals
+
+    return {
+        "bnb": bnb_balance,
+        "usdc": usdc_balance
+    }
+
+
+async def get_balance(client: StandXHTTPClient, wallet_address: str, chain: str = "solana") -> None:
     """残高情報を取得して表示."""
     try:
         # StandX取引所残高
@@ -224,8 +283,17 @@ async def get_balance(client: StandXHTTPClient, wallet_address: str) -> None:
             else:
                 raise
 
-        # Solanaウォレット残高
-        solana_balance = await get_solana_balance(wallet_address)
+        # チェーン別のウォレット残高取得
+        if chain.lower() == "bsc":
+            chain_balance = await get_bsc_balance(wallet_address)
+            chain_name = "BSC"
+            native_token = "BNB"
+            native_balance = chain_balance["bnb"]
+        else:  # solana
+            chain_balance = await get_solana_balance(wallet_address)
+            chain_name = "Solana"
+            native_token = "SOL"
+            native_balance = chain_balance["sol"]
 
         # StandX残高テーブル
         standx_table = Table(title="💰 StandX Exchange Balance", box=box.ROUNDED)
@@ -251,15 +319,15 @@ async def get_balance(client: StandXHTTPClient, wallet_address: str) -> None:
         console.print(standx_table)
         console.print()
 
-        # Solana残高テーブル
-        solana_table = Table(title="🔗 Solana Wallet Balance", box=box.ROUNDED)
-        solana_table.add_column("Token", style="cyan", no_wrap=True)
-        solana_table.add_column("Balance", style="green", justify="right")
+        # チェーン残高テーブル
+        chain_table = Table(title=f"🔗 {chain_name} Wallet Balance", box=box.ROUNDED)
+        chain_table.add_column("Token", style="cyan", no_wrap=True)
+        chain_table.add_column("Balance", style="green", justify="right")
 
-        solana_table.add_row("SOL", f"{solana_balance['sol']:.4f}")
-        solana_table.add_row("USDC", f"${solana_balance['usdc']:,.2f}")
+        chain_table.add_row(native_token, f"{native_balance:.4f}")
+        chain_table.add_row("USDC", f"${chain_balance['usdc']:,.2f}")
 
-        console.print(solana_table)
+        console.print(chain_table)
         console.print(f"[green]✅ Balance fetched successfully[/green]")
 
     except Exception as e:
@@ -267,18 +335,19 @@ async def get_balance(client: StandXHTTPClient, wallet_address: str) -> None:
         raise
 
 
-async def get_status(client: StandXHTTPClient, symbol: str, wallet_address: str) -> None:
+async def get_status(client: StandXHTTPClient, symbol: str, wallet_address: str, chain: str = "solana") -> None:
     """全ての状態を一括表示."""
     console.print(Panel(
         f"[bold cyan]StandX API Status Check[/bold cyan]\n"
         f"Symbol: {symbol}\n"
+        f"Chain: {chain.upper()}\n"
         f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         box=box.DOUBLE
     ))
     console.print()
 
     # 残高情報
-    await get_balance(client, wallet_address)
+    await get_balance(client, wallet_address, chain)
     console.print()
 
     # 価格情報
@@ -317,9 +386,9 @@ async def main() -> None:
             elif command == "position":
                 await get_position(client, config.symbol)
             elif command == "balance":
-                await get_balance(client, config.standx_wallet_address)
+                await get_balance(client, config.standx_wallet_address, config.standx_chain)
             elif command == "status":
-                await get_status(client, config.symbol, config.standx_wallet_address)
+                await get_status(client, config.symbol, config.standx_wallet_address, config.standx_chain)
             else:
                 console.print(f"[red]Unknown command: {command}[/red]")
                 console.print("Available commands: price, orders, position, balance, status")

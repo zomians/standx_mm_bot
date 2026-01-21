@@ -1,47 +1,50 @@
 #!/usr/bin/env python3
-"""Solanaウォレットを作成し、.envファイルを生成する."""
+"""BSC (EVM) ウォレットを作成し、.envファイルを生成する."""
 
 import os
 import sys
 from pathlib import Path
 
 try:
+    from eth_account import Account
     from nacl.signing import SigningKey
-    import base58
 except ImportError as e:
     print(f"Error: Required library is not installed: {e}")
-    print("Install with: pip install pynacl base58")
+    print("Install with: pip install eth-account pynacl")
     sys.exit(1)
 
 
-def create_wallet() -> tuple[str, str]:
+def create_wallet() -> tuple[str, str, str]:
     """
-    新しいSolanaウォレットを作成.
+    新しいBSCウォレットとAPIリクエスト署名用Ed25519鍵を作成.
 
     Returns:
-        tuple[str, str]: (private_key_hex, address_base58)
+        tuple[str, str, str]: (private_key_hex, address, request_signing_key_hex)
     """
-    # Ed25519鍵ペアを生成
+    # secp256k1鍵ペアを生成（ウォレット用）
+    account = Account.create()
+
+    # 秘密鍵を0x付きhex形式で取得
+    private_key_hex = "0x" + account.key.hex()
+
+    # アドレスを0x付きhex形式で取得
+    address = account.address
+
+    # Ed25519鍵ペアを生成（APIリクエスト署名用）
     signing_key = SigningKey.generate()
+    request_signing_key_hex = bytes(signing_key).hex()
 
-    # 秘密鍵（32バイト）をhex形式で取得
-    private_key_bytes = bytes(signing_key)
-    private_key_hex = private_key_bytes.hex()
-
-    # 公開鍵からSolanaアドレスを生成（Base58エンコード）
-    public_key_bytes = bytes(signing_key.verify_key)
-    address_base58 = base58.b58encode(public_key_bytes).decode('ascii')
-
-    return private_key_hex, address_base58
+    return private_key_hex, address, request_signing_key_hex
 
 
-def create_env_file(private_key: str, address: str) -> None:
+def create_env_file(private_key: str, address: str, request_signing_key: str) -> None:
     """
     .envファイルを作成.
 
     Args:
-        private_key: 秘密鍵（hex形式）
-        address: ウォレットアドレス（Base58）
+        private_key: 秘密鍵（0x形式）
+        address: ウォレットアドレス（0x形式）
+        request_signing_key: APIリクエスト署名用Ed25519秘密鍵（hex形式）
     """
     # プロジェクトルートのパス
     project_root = Path(__file__).parent.parent
@@ -68,10 +71,18 @@ def create_env_file(private_key: str, address: str) -> None:
     with open(env_example_path) as f:
         content = f.read()
 
-    # 秘密鍵とアドレスを埋め込む（0xプレフィックスなし、hex形式）
+    # 秘密鍵とアドレスを埋め込む
     content = content.replace("STANDX_PRIVATE_KEY=0x...", f"STANDX_PRIVATE_KEY={private_key}")
     content = content.replace(
         "STANDX_WALLET_ADDRESS=0x...", f"STANDX_WALLET_ADDRESS={address}"
+    )
+
+    # STANDX_CHAIN を bsc に設定
+    content = content.replace("STANDX_CHAIN=solana", "STANDX_CHAIN=bsc")
+
+    # リクエスト署名鍵を埋め込む
+    content = content.replace(
+        "STANDX_REQUEST_SIGNING_KEY=", f"STANDX_REQUEST_SIGNING_KEY={request_signing_key}"
     )
 
     # .envファイルを書き込み
@@ -87,35 +98,36 @@ def create_env_file(private_key: str, address: str) -> None:
 def main() -> None:
     """メイン処理."""
     print("=" * 60)
-    print("Solana Wallet Generator (Ed25519)")
+    print("BSC Wallet Generator (secp256k1 / EVM)")
     print("=" * 60)
 
     # ウォレット作成
-    print("\n🔐 Generating new Solana wallet...")
-    private_key, address = create_wallet()
+    print("\n🔐 Generating new BSC wallet...")
+    private_key, address, request_signing_key = create_wallet()
 
     # 結果を表示
     print("\n" + "=" * 60)
     print("⚠️  IMPORTANT: Save this information securely!")
     print("=" * 60)
-    print(f"\nWallet Address (Base58): {address}")
-    print(f"Private Key (hex):       {private_key}")
+    print(f"\nWallet Address (0x):              {address}")
+    print(f"Private Key (0x):                 {private_key}")
+    print(f"Request Signing Key (Ed25519):    {request_signing_key}")
     print("\n" + "=" * 60)
     print("⚠️  Security Warnings:")
     print("=" * 60)
     print("1. NEVER commit .env file to Git")
     print("2. NEVER share your private key")
     print("3. Use this wallet for TESTING ONLY")
-    print("4. Keep only small amounts of SOL for transaction fees")
+    print("4. Keep only small amounts of BNB for transaction fees")
     print("=" * 60)
 
     # .envファイルを作成
     print("\n📝 Creating .env file...")
-    create_env_file(private_key, address)
+    create_env_file(private_key, address, request_signing_key)
 
     print("\n✅ Setup complete!")
     print("\nNext steps:")
-    print("1. Deposit small amount of SOL for transaction fees (~0.01 SOL)")
+    print("1. Deposit small amount of BNB for transaction fees (~0.01 BNB)")
     print("2. Review .env file and adjust settings if needed")
     print("3. Run: make test")
     print()

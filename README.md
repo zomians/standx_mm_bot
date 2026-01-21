@@ -194,7 +194,9 @@ StandX APIのデータを確認するためのツールコマンドです：
 
 ```bash
 # ウォレット作成（初回のみ）
-make wallet
+make wallet          # BSC (EVM) ウォレット作成（デフォルト）
+make wallet-bsc      # BSC (EVM) ウォレット作成
+make wallet-solana   # Solana ウォレット作成
 
 # 現在の設定確認
 make config
@@ -208,7 +210,7 @@ make orders
 # 現在のポジションを取得
 make position
 
-# 残高を取得（StandX + Solana）
+# 残高を取得（StandX + チェーン残高）
 make balance
 
 # すべてのステータスを取得

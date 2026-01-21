@@ -41,7 +41,7 @@ def test_settings_default_values() -> None:
     settings = Settings()
 
     # デフォルト値の確認
-    assert settings.standx_chain == "solana"
+    assert settings.standx_chain == "bsc"
     assert settings.symbol == "ETH-USD"
     assert settings.order_size == 0.1
     assert settings.target_distance_bps == 8.0
