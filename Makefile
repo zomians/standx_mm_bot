@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet
+.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position status
 
 # 開発環境: Bot起動
 up:
@@ -63,3 +63,20 @@ restart-prod:
 wallet:
 	@echo "Creating new Solana wallet and generating .env file..."
 	docker compose run --rm bot python scripts/create_wallet.py
+
+# API読み取りコマンド（動作確認・デバッグ用）
+price:
+	@echo "Fetching current price..."
+	docker compose run --rm bot python scripts/read_api.py price
+
+orders:
+	@echo "Fetching open orders..."
+	docker compose run --rm bot python scripts/read_api.py orders
+
+position:
+	@echo "Fetching current position..."
+	docker compose run --rm bot python scripts/read_api.py position
+
+status:
+	@echo "Fetching all status..."
+	docker compose run --rm bot python scripts/read_api.py status

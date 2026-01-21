@@ -17,6 +17,7 @@ dependencies = [
     "PyJWT>=2.8",
     "cryptography>=41.0",
     "python-dotenv>=1.0",
+    "rich>=13.0",
 ]
 
 [project.optional-dependencies]
