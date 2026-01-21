@@ -76,6 +76,9 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (require real API access)",
+]
 
 [tool.coverage.run]
 source = ["src/standx_mm_bot"]

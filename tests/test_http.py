@@ -42,7 +42,8 @@ def dry_run_config() -> Settings:
 @pytest.mark.asyncio
 async def test_context_manager(config: Settings) -> None:
     """コンテキストマネージャーが正しく動作することを確認."""
-    async with StandXHTTPClient(config) as client:
+    # テスト用のJWTトークンを指定
+    async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
         assert client.session is not None
 
     # コンテキスト終了後はセッションがクローズされる
@@ -63,7 +64,7 @@ async def test_get_symbol_price(config: Settings) -> None:
             },
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             response = await client.get_symbol_price("ETH_USDC")
 
         assert response["symbol"] == "ETH_USDC"
@@ -73,7 +74,7 @@ async def test_get_symbol_price(config: Settings) -> None:
 @pytest.mark.asyncio
 async def test_new_order_dry_run(dry_run_config: Settings) -> None:
     """ドライランモードで注文発注がモックされることを確認."""
-    async with StandXHTTPClient(dry_run_config) as client:
+    async with StandXHTTPClient(dry_run_config, jwt_token="test_jwt_token") as client:
         response = await client.new_order(
             symbol="ETH_USDC",
             side="BUY",
@@ -106,7 +107,7 @@ async def test_new_order(config: Settings) -> None:
             },
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             response = await client.new_order(
                 symbol="ETH_USDC",
                 side="BUY",
@@ -121,7 +122,7 @@ async def test_new_order(config: Settings) -> None:
 @pytest.mark.asyncio
 async def test_cancel_order_dry_run(dry_run_config: Settings) -> None:
     """ドライランモードで注文キャンセルがモックされることを確認."""
-    async with StandXHTTPClient(dry_run_config) as client:
+    async with StandXHTTPClient(dry_run_config, jwt_token="test_jwt_token") as client:
         response = await client.cancel_order(
             order_id="order_123",
             symbol="ETH_USDC",
@@ -146,7 +147,7 @@ async def test_cancel_order(config: Settings) -> None:
             },
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             response = await client.cancel_order(
                 order_id="order_123",
                 symbol="ETH_USDC",
@@ -171,7 +172,7 @@ async def test_get_open_orders(config: Settings) -> None:
             },
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             response = await client.get_open_orders("ETH_USDC")
 
         assert len(response["orders"]) == 2
@@ -184,7 +185,7 @@ async def test_get_position(config: Settings) -> None:
     with aioresponses() as mocked:
         # モックレスポンスを設定
         mocked.get(
-            "https://perps.standx.com/api/query_position?symbol=ETH_USDC",
+            "https://perps.standx.com/api/query_positions?symbol=ETH_USDC",
             payload={
                 "symbol": "ETH_USDC",
                 "side": "LONG",
@@ -193,7 +194,7 @@ async def test_get_position(config: Settings) -> None:
             },
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             response = await client.get_position("ETH_USDC")
 
         assert response["symbol"] == "ETH_USDC"
@@ -210,7 +211,7 @@ async def test_authentication_error(config: Settings) -> None:
             status=401,
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             with pytest.raises(AuthenticationError, match="JWT expired or invalid"):
                 await client.get_symbol_price("ETH_USDC")
 
@@ -232,7 +233,7 @@ async def test_rate_limit_retry(config: Settings) -> None:
 
         # asyncio.sleepをモック
         with patch("asyncio.sleep", return_value=None):
-            async with StandXHTTPClient(config) as client:
+            async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
                 response = await client.get_symbol_price("ETH_USDC")
 
         # リトライ後に成功
@@ -250,7 +251,7 @@ async def test_api_error(config: Settings) -> None:
             body="Bad Request",
         )
 
-        async with StandXHTTPClient(config) as client:
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
             with pytest.raises(APIError, match="HTTP 400"):
                 await client.get_symbol_price("ETH_USDC")
 
@@ -258,7 +259,7 @@ async def test_api_error(config: Settings) -> None:
 @pytest.mark.asyncio
 async def test_session_not_initialized(config: Settings) -> None:
     """セッション未初期化時にエラーが発生することを確認."""
-    client = StandXHTTPClient(config)
+    client = StandXHTTPClient(config, jwt_token="test_jwt_token")
 
     with pytest.raises(RuntimeError, match="Session not initialized"):
         await client.get_symbol_price("ETH_USDC")

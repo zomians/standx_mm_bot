@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+import uuid
 from typing import Any, cast
 
 import aiohttp
+import jwt as pyjwt
 
-from standx_mm_bot.auth import generate_auth_headers, generate_jwt
+from standx_mm_bot.auth import generate_auth_headers, sign_message, sign_message_solana
 from standx_mm_bot.client.exceptions import (
     APIError,
     AuthenticationError,
@@ -20,32 +22,122 @@ logger = logging.getLogger(__name__)
 class StandXHTTPClient:
     """StandX REST API クライアント."""
 
-    def __init__(self, config: Settings):
+    def __init__(self, config: Settings, jwt_token: str | None = None):
         """
         HTTPクライアントを初期化.
 
         Args:
             config: アプリケーション設定
+            jwt_token: JWTトークン（テスト用、省略時は自動取得）
         """
         self.config = config
         self.base_url = "https://perps.standx.com"
-        self.jwt_token = generate_jwt(
-            config.standx_private_key,
-            config.standx_wallet_address,
-            config.standx_chain,
-            config.jwt_expires_seconds,
-        )
+        self.auth_base_url = "https://api.standx.com"
+        self.jwt_token = jwt_token
         self.session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "StandXHTTPClient":
         """非同期コンテキストマネージャー (enter)."""
         self.session = aiohttp.ClientSession()
+        # JWTトークンが未設定の場合のみ取得
+        if self.jwt_token is None:
+            self.jwt_token = await self._obtain_jwt()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """非同期コンテキストマネージャー (exit)."""
         if self.session:
             await self.session.close()
+
+    async def _obtain_jwt(self) -> str:
+        """
+        StandX APIからJWTトークンを取得.
+
+        Returns:
+            str: JWTトークン
+
+        Raises:
+            AuthenticationError: JWT取得に失敗
+        """
+        if self.session is None:
+            raise RuntimeError("Session not initialized")
+
+        try:
+            # Step 1: prepare-signin でsignedDataを取得
+            request_id = str(uuid.uuid4())
+            prepare_url = (
+                f"{self.auth_base_url}/v1/offchain/prepare-signin?chain={self.config.standx_chain}"
+            )
+            prepare_body = {
+                "address": self.config.standx_wallet_address,
+                "requestId": request_id,
+            }
+
+            async with self.session.post(
+                prepare_url,
+                json=prepare_body,
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    raise AuthenticationError(
+                        f"Failed to prepare signin: HTTP {resp.status}: {error_text}"
+                    )
+                prepare_result = await resp.json()
+
+            signed_data = prepare_result.get("signedData")
+            if not signed_data:
+                raise AuthenticationError("No signedData in prepare-signin response")
+
+            # Step 2: signedDataをデコードしてmessageを取得
+            # signedDataはJWT形式の文字列
+            try:
+                # JWTをデコード（署名検証なし）
+                decoded_payload = pyjwt.decode(signed_data, options={"verify_signature": False})
+                message = decoded_payload.get("message")
+                if not message:
+                    raise AuthenticationError("No message in decoded signedData")
+            except Exception as e:
+                raise AuthenticationError(f"Failed to decode signedData: {e}") from e
+
+            # Solanaチェーンの場合は特殊な署名形式を使用
+            if self.config.standx_chain.lower() == "solana":
+                # inputはデコードされたpayload
+                signature = sign_message_solana(
+                    self.config.standx_private_key, message, decoded_payload
+                )
+            else:
+                signature = sign_message(self.config.standx_private_key, message)
+
+            # Step 3: login でJWTトークンを取得
+            login_url = f"{self.auth_base_url}/v1/offchain/login?chain={self.config.standx_chain}"
+            # signedDataが文字列の場合は元のprepare_resultから取得し直す
+            login_signed_data = prepare_result.get("signedData")
+            login_body = {
+                "signature": signature,
+                "signedData": login_signed_data,
+                "expiresSeconds": self.config.jwt_expires_seconds,
+            }
+
+            async with self.session.post(
+                login_url,
+                json=login_body,
+                headers={"Content-Type": "application/json"},
+            ) as resp:
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    raise AuthenticationError(f"Failed to login: HTTP {resp.status}: {error_text}")
+                login_result = await resp.json()
+
+            token = login_result.get("token")
+            if not token:
+                raise AuthenticationError("No token in login response")
+
+            logger.info("Successfully obtained JWT token")
+            return str(token)
+
+        except aiohttp.ClientError as e:
+            raise AuthenticationError(f"Network error during JWT acquisition: {e}") from e
 
     async def _request(
         self,
@@ -72,22 +164,36 @@ class StandXHTTPClient:
         if self.session is None:
             raise RuntimeError("Session not initialized. Use 'async with' context manager.")
 
-        # 認証ヘッダー生成
-        headers = generate_auth_headers(
+        if self.jwt_token is None:
+            raise RuntimeError("JWT token not initialized. Use 'async with' context manager.")
+
+        # 認証ヘッダー生成（署名計算で使用したペイロード文字列も返される）
+        headers, payload_str = generate_auth_headers(
             self.jwt_token,
             self.config.standx_private_key,
             method,
             path,
             body,
+            self.config.standx_chain,
         )
         headers["Content-Type"] = "application/json"
+
+        # POSTの場合、署名計算と完全に同じJSON文字列を送信
+        request_kwargs: dict[str, Any]
+        if method.upper() == "POST" and payload_str:
+            logger.debug(f"Request body (exact string used in signature): {payload_str}")
+            request_kwargs = {"data": payload_str}
+        else:
+            request_kwargs = {}
+
+        logger.debug(f"Request headers: {headers}")
 
         try:
             async with self.session.request(
                 method,
                 self.base_url + path,
-                json=body,
                 headers=headers,
+                **request_kwargs,
             ) as resp:
                 if resp.status == 200:
                     return cast(dict[str, Any], await resp.json())
@@ -123,19 +229,21 @@ class StandXHTTPClient:
         side: str,
         price: float,
         size: float,
-        order_type: str = "LIMIT",
-        post_only: bool = True,
+        order_type: str = "limit",
+        time_in_force: str = "gtc",
+        reduce_only: bool = False,
     ) -> dict[str, Any]:
         """
         新規注文を発注.
 
         Args:
             symbol: 取引ペア
-            side: 注文サイド (BUY/SELL)
+            side: 注文サイド (buy/sell、小文字)
             price: 注文価格
             size: 注文サイズ
-            order_type: 注文タイプ (LIMIT/MARKET)
-            post_only: Post-Onlyフラグ
+            order_type: 注文タイプ (limit/market、小文字)
+            time_in_force: 注文有効期限 (gtc/ioc/fok)
+            reduce_only: ポジション縮小のみフラグ
 
         Returns:
             dict: 注文情報
@@ -143,26 +251,28 @@ class StandXHTTPClient:
         if self.config.dry_run:
             logger.info(
                 f"[DRY RUN] new_order: symbol={symbol}, side={side}, "
-                f"price={price}, size={size}, type={order_type}, post_only={post_only}"
+                f"price={price}, size={size}, type={order_type}"
             )
             # ドライランモード: モックレスポンスを返す
             return {
                 "order_id": "dry_run_order_id",
                 "symbol": symbol,
                 "side": side,
-                "price": price,
-                "size": size,
+                "price": str(price),
+                "qty": str(size),
                 "order_type": order_type,
                 "status": "OPEN",
             }
 
+        # API仕様に従ったボディ構築
         body = {
             "symbol": symbol,
-            "side": side,
-            "price": price,
-            "size": size,
-            "order_type": order_type,
-            "post_only": post_only,
+            "side": side.lower(),  # 小文字に変換
+            "order_type": order_type.lower(),  # 小文字に変換
+            "qty": str(size),  # 文字列として送信
+            "price": str(price),  # 文字列として送信
+            "time_in_force": time_in_force,
+            "reduce_only": reduce_only,
         }
         return await self._request("POST", "/api/new_order", body)
 
@@ -212,5 +322,5 @@ class StandXHTTPClient:
         Returns:
             dict: ポジション情報
         """
-        path = f"/api/query_position?symbol={symbol}"
+        path = f"/api/query_positions?symbol={symbol}"
         return await self._request("GET", path)

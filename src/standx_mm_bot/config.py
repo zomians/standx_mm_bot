@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     # 認証
     standx_private_key: str = Field(..., description="ウォレット秘密鍵")
     standx_wallet_address: str = Field(..., description="ウォレットアドレス")
-    standx_chain: str = Field("bsc", description="チェーン (bsc or solana)")
+    standx_chain: str = Field("solana", description="チェーン (bsc or solana)")
 
     # 取引設定
-    symbol: str = Field("ETH_USDC", description="取引ペア")
+    symbol: str = Field("ETH-USD", description="取引ペア")
     order_size: float = Field(0.1, description="片側注文サイズ")
 
     # 距離設定 (bps)
