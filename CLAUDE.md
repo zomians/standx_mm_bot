@@ -127,7 +127,20 @@ standx_mm_bot/
 
 ```bash
 # 起動
-make run
+make up
+
+# ETH-USDで起動
+make up-eth
+
+# BTC-USDで起動
+make up-btc
+
+# シンボル切り替え
+make switch-eth  # ETH-USD
+make switch-btc  # BTC-USD
+
+# 設定確認
+make config
 
 # テスト
 make test
