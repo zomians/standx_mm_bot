@@ -70,6 +70,8 @@ StandX は「板に居続けること」に報酬が出る Perp DEX。このBot�
 
 ### 1. 環境構築
 
+このプロジェクトは**Dockerベース**で動作します。ローカルにPython環境は不要です。
+
 ```bash
 # リポジトリクローン
 git clone https://github.com/zomians/standx_mm_bot.git
@@ -79,6 +81,15 @@ cd standx_mm_bot
 docker --version
 docker compose version
 ```
+
+**必要なもの:**
+- Docker
+- Docker Compose
+- Git
+
+**不要なもの:**
+- ローカルPython環境
+- pip / venv
 
 ### 2. 環境変数設定
 
@@ -150,6 +161,37 @@ standx_mm_bot/
 ---
 
 ## よく使うコマンド
+
+### 🐳 重要: すべてのコマンドはDockerコンテナ内で実行されます
+
+このプロジェクトでは、すべての開発作業がDockerコンテナ内で実行されます。
+**ローカルにPython環境をインストールする必要はありません。**
+
+各`make`コマンドは内部で`docker compose run --rm bot <command>`を実行しています。
+
+### ツールコマンド（開発・デバッグ用）
+
+StandX APIのデータを確認するためのツールコマンドです：
+
+```bash
+# ウォレット作成（初回のみ）
+make wallet
+
+# 現在の価格を取得
+make price
+
+# 未決注文を取得
+make orders
+
+# 現在のポジションを取得
+make position
+
+# 残高を取得（StandX + Solana）
+make balance
+
+# すべてのステータスを取得
+make status
+```
 
 ### 開発環境
 
@@ -329,6 +371,54 @@ WebSocket: wss://perps.standx.com/ws-stream/v1
 ---
 
 ## トラブルシューティング
+
+### Docker関連
+
+#### Dockerデーモンが起動していない
+
+```
+Error: Cannot connect to the Docker daemon
+```
+
+**対処**:
+```bash
+# macOS
+open -a Docker
+
+# Linux
+sudo systemctl start docker
+```
+
+#### ポートが既に使用されている
+
+```
+Error: Bind for 0.0.0.0:8000 failed: port is already allocated
+```
+
+**対処**:
+```bash
+# 使用中のポートを確認
+docker ps
+
+# 既存のコンテナを停止
+make down
+```
+
+#### ボリュームマウントの権限エラー
+
+```
+Error: Permission denied
+```
+
+**対処**:
+```bash
+# Dockerfileで非rootユーザー（botuser）を使用しているため、
+# ホスト側のファイル権限を確認
+ls -la
+
+# 必要に応じて権限を修正
+chmod -R 755 .
+```
 
 ### 認証エラー
 
