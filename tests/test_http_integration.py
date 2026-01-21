@@ -20,6 +20,16 @@ async def test_real_api_order_crud(real_config: Settings) -> None:
     order_id = None
 
     async with StandXHTTPClient(real_config) as client:
+        # 残高確認（残高不足の場合はスキップ）
+        try:
+            balance_response = await client.get_balance()
+            # cross_available（利用可能額）をチェック
+            available = float(balance_response.get("cross_available", 0))
+            if available < 1.0:  # 最低$1必要
+                pytest.skip(f"Insufficient balance: ${available:.2f} (need at least $1.00 for testing)")
+        except Exception as e:
+            pytest.skip(f"Cannot check balance: {e}")
+
         try:
             # 現在の価格を取得
             price_response = await client.get_symbol_price(real_config.symbol)
