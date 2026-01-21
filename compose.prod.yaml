@@ -1,0 +1,8 @@
+services:
+  bot:
+    build:
+      context: .
+      target: prod
+    env_file:
+      - .env
+    restart: unless-stopped
