@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
+import aiohttp
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -16,6 +17,12 @@ from standx_mm_bot.config import Settings
 
 
 console = Console()
+
+# Solana RPC エンドポイント（メインネット）
+SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
+
+# USDC Mint Address (Solana mainnet)
+USDC_MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
 
 async def get_price(client: StandXHTTPClient, symbol: str) -> None:
@@ -150,7 +157,117 @@ async def get_position(client: StandXHTTPClient, symbol: str) -> None:
         raise
 
 
-async def get_status(client: StandXHTTPClient, symbol: str) -> None:
+async def get_solana_balance(wallet_address: str) -> dict[str, Any]:
+    """
+    Solanaウォレットの残高を取得.
+
+    Args:
+        wallet_address: ウォレットアドレス
+
+    Returns:
+        dict: SOL残高とUSDC残高
+    """
+    async with aiohttp.ClientSession() as session:
+        # SOL残高取得
+        sol_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getBalance",
+            "params": [wallet_address]
+        }
+        async with session.post(SOLANA_RPC_URL, json=sol_payload) as response:
+            sol_result = await response.json()
+            sol_balance = sol_result.get("result", {}).get("value", 0) / 1e9  # lamports to SOL
+
+        # USDCトークンアカウント取得
+        usdc_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getTokenAccountsByOwner",
+            "params": [
+                wallet_address,
+                {"mint": USDC_MINT_ADDRESS},
+                {"encoding": "jsonParsed"}
+            ]
+        }
+        async with session.post(SOLANA_RPC_URL, json=usdc_payload) as response:
+            usdc_result = await response.json()
+            usdc_accounts = usdc_result.get("result", {}).get("value", [])
+            usdc_balance = 0.0
+            if usdc_accounts:
+                # 最初のアカウントのUSDC残高を取得
+                token_amount = usdc_accounts[0]["account"]["data"]["parsed"]["info"]["tokenAmount"]
+                usdc_balance = float(token_amount["uiAmount"])
+
+    return {
+        "sol": sol_balance,
+        "usdc": usdc_balance
+    }
+
+
+async def get_balance(client: StandXHTTPClient, wallet_address: str) -> None:
+    """残高情報を取得して表示."""
+    try:
+        # StandX取引所残高
+        try:
+            standx_balance = await client.get_balance()
+        except Exception as e:
+            # 404エラー（残高レコードなし）の場合はゼロとして扱う
+            if "404" in str(e) or "not found" in str(e).lower():
+                console.print("[yellow]⚠️  StandX account has no balance (not deposited yet)[/yellow]")
+                standx_balance = {
+                    "equity": 0,
+                    "cross_available": 0,
+                    "upnl": 0,
+                    "locked": 0
+                }
+            else:
+                raise
+
+        # Solanaウォレット残高
+        solana_balance = await get_solana_balance(wallet_address)
+
+        # StandX残高テーブル
+        standx_table = Table(title="💰 StandX Exchange Balance", box=box.ROUNDED)
+        standx_table.add_column("Field", style="cyan", no_wrap=True)
+        standx_table.add_column("Value", style="green", justify="right")
+
+        equity = float(standx_balance.get("equity", 0))
+        available = float(standx_balance.get("cross_available", 0))
+        upnl = float(standx_balance.get("upnl", 0))
+        locked = float(standx_balance.get("locked", 0))
+
+        standx_table.add_row("Equity (資産額)", f"${equity:,.2f}")
+        standx_table.add_row("Available (利用可能額)", f"${available:,.2f}")
+        standx_table.add_row("Locked (ロック額)", f"${locked:,.2f}")
+
+        upnl_color = "green" if upnl >= 0 else "red"
+        upnl_symbol = "+" if upnl >= 0 else ""
+        standx_table.add_row(
+            "Unrealized PnL (未実現損益)",
+            f"[{upnl_color}]{upnl_symbol}${upnl:,.2f}[/{upnl_color}]"
+        )
+
+        console.print(standx_table)
+        console.print()
+
+        # Solana残高テーブル
+        solana_table = Table(title="🔗 Solana Wallet Balance", box=box.ROUNDED)
+        solana_table.add_column("Token", style="cyan", no_wrap=True)
+        solana_table.add_column("Balance", style="green", justify="right")
+
+        solana_table.add_row("SOL", f"{solana_balance['sol']:.4f}")
+        solana_table.add_row("USDC", f"${solana_balance['usdc']:,.2f}")
+
+        console.print(solana_table)
+        console.print(f"[green]✅ Balance fetched successfully[/green]")
+
+    except Exception as e:
+        console.print(f"[red]❌ Error fetching balance: {e}[/red]")
+        raise
+
+
+async def get_status(client: StandXHTTPClient, symbol: str, wallet_address: str) -> None:
     """全ての状態を一括表示."""
     console.print(Panel(
         f"[bold cyan]StandX API Status Check[/bold cyan]\n"
@@ -158,6 +275,10 @@ async def get_status(client: StandXHTTPClient, symbol: str) -> None:
         f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         box=box.DOUBLE
     ))
+    console.print()
+
+    # 残高情報
+    await get_balance(client, wallet_address)
     console.print()
 
     # 価格情報
@@ -176,7 +297,7 @@ async def main() -> None:
     """メイン処理."""
     if len(sys.argv) < 2:
         console.print("[red]Usage: python read_api.py <command>[/red]")
-        console.print("Commands: price, orders, position, status")
+        console.print("Commands: price, orders, position, balance, status")
         sys.exit(1)
 
     command = sys.argv[1].lower()
@@ -195,11 +316,13 @@ async def main() -> None:
                 await get_orders(client, config.symbol)
             elif command == "position":
                 await get_position(client, config.symbol)
+            elif command == "balance":
+                await get_balance(client, config.standx_wallet_address)
             elif command == "status":
-                await get_status(client, config.symbol)
+                await get_status(client, config.symbol, config.standx_wallet_address)
             else:
                 console.print(f"[red]Unknown command: {command}[/red]")
-                console.print("Available commands: price, orders, position, status")
+                console.print("Available commands: price, orders, position, balance, status")
                 sys.exit(1)
 
     except Exception as e:

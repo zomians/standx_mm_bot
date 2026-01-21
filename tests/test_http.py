@@ -202,6 +202,31 @@ async def test_get_position(config: Settings) -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_balance(config: Settings) -> None:
+    """残高情報取得が正しく動作することを確認."""
+    with aioresponses() as mocked:
+        # モックレスポンスを設定
+        mocked.get(
+            "https://perps.standx.com/api/query_balance",
+            payload={
+                "equity": 10000.0,
+                "cross_available": 8000.0,
+                "upnl": 500.0,
+                "locked": 2000.0,
+                "balance": 9500.0,
+            },
+        )
+
+        async with StandXHTTPClient(config, jwt_token="test_jwt_token") as client:
+            response = await client.get_balance()
+
+        assert response["equity"] == 10000.0
+        assert response["cross_available"] == 8000.0
+        assert response["upnl"] == 500.0
+        assert response["locked"] == 2000.0
+
+
+@pytest.mark.asyncio
 async def test_authentication_error(config: Settings) -> None:
     """認証エラー (401) が正しく処理されることを確認."""
     with aioresponses() as mocked:

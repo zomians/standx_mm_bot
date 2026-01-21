@@ -324,3 +324,23 @@ class StandXHTTPClient:
         """
         path = f"/api/query_positions?symbol={symbol}"
         return await self._request("GET", path)
+
+    async def get_balance(self) -> dict[str, Any]:
+        """
+        残高情報を取得.
+
+        Returns:
+            dict: 残高情報
+                - isolated_balance: 隔離ウォレット合計
+                - isolated_upnl: 隔離未実現損益
+                - cross_balance: クロス自由残高
+                - cross_margin: クロス証拠金使用額
+                - cross_upnl: クロス未実現損益
+                - locked: オーダーロック額
+                - cross_available: 利用可能額
+                - balance: 総資産
+                - upnl: 合計未実現損益
+                - equity: アカウント資産額
+                - pnl_freeze: 24時間実現損益
+        """
+        return await self._request("GET", "/api/query_balance")
