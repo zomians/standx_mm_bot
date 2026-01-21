@@ -1,6 +1,7 @@
 # Environment (NEVER COMMIT)
 .env
-.env.*
+.env.local
+.env.*.local
 
 # Python
 __pycache__/
