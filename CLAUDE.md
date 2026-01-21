@@ -54,6 +54,7 @@ Claude 向けクイックリファレンス。
 - **Python 3.12+** / asyncio / aiohttp / websockets
 - **pydantic-settings** (設定管理)
 - **Ruff** (Lint/Format) / **mypy** (型チェック) / **pytest** (テスト)
+- **対応チェーン**: BSC (デフォルト) / Solana
 
 ### アーキテクチャ概要
 
@@ -126,6 +127,11 @@ standx_mm_bot/
 ## よく使うコマンド
 
 ```bash
+# ウォレット作成（初回のみ）
+make wallet          # BSC (EVM) ウォレット作成（デフォルト）
+make wallet-bsc      # BSC (EVM) ウォレット作成
+make wallet-solana   # Solana ウォレット作成
+
 # 起動
 make up
 

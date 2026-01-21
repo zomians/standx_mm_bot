@@ -6,6 +6,8 @@ import time
 import uuid
 from typing import Any
 
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from nacl.signing import SigningKey
 
 
@@ -81,6 +83,31 @@ def sign_message_solana(private_key: str, message: str, signed_data: Any) -> str
     # JSONをBase64エンコード
     signature_json = json.dumps(signature_obj, separators=(",", ":"))
     return base64.b64encode(signature_json.encode()).decode("ascii")
+
+
+def sign_message_evm(private_key: str, message: str) -> str:
+    """
+    EVM用のメッセージ署名（16進数）.
+
+    Args:
+        private_key: 秘密鍵（0x形式）
+        message: 署名するメッセージ
+
+    Returns:
+        str: 16進数署名（0x付き）
+    """
+    # eth-account.Account を使用して署名
+    account = Account.from_key(private_key)
+
+    # メッセージをEIP-191形式でエンコード
+    message_hash = encode_defunct(text=message)
+
+    # 署名を生成
+    signed_message = account.sign_message(message_hash)
+
+    # 16進数署名を返す（0x付き）
+    signature_hex: str = signed_message.signature.hex()
+    return "0x" + signature_hex
 
 
 def generate_request_signature(

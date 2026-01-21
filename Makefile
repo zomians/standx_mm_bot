@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position balance status switch-eth switch-btc up-eth up-btc config
+.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet wallet-bsc wallet-solana price orders position balance status switch-eth switch-btc up-eth up-btc config
 
 # 開発環境: Bot起動
 up:
@@ -59,10 +59,18 @@ up-prod:
 restart-prod:
 	docker compose -f compose.prod.yaml restart
 
-# ウォレット作成と.env生成
-wallet:
+# ウォレット作成と.env生成（デフォルト: BSC）
+wallet: wallet-bsc
+
+# BSC ウォレット作成
+wallet-bsc:
+	@echo "Creating new BSC wallet and generating .env file..."
+	docker compose run --rm bot python scripts/create_wallet_bsc.py
+
+# Solana ウォレット作成
+wallet-solana:
 	@echo "Creating new Solana wallet and generating .env file..."
-	docker compose run --rm bot python scripts/create_wallet.py
+	docker compose run --rm bot python scripts/create_wallet_solana.py
 
 # API読み取りコマンド（動作確認・デバッグ用）
 price:
@@ -78,7 +86,7 @@ position:
 	docker compose run --rm bot python scripts/read_api.py position
 
 balance:
-	@echo "Fetching balance (StandX + Solana)..."
+	@echo "Fetching balance (StandX + Chain)..."
 	docker compose run --rm bot python scripts/read_api.py balance
 
 status:

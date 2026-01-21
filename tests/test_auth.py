@@ -9,6 +9,7 @@ from standx_mm_bot.auth import (
     generate_auth_headers,
     generate_request_signature,
     sign_message,
+    sign_message_evm,
 )
 
 
@@ -168,3 +169,69 @@ def test_sign_message_short_private_key() -> None:
 
     with pytest.raises(ValueError):
         sign_message(short_private_key, message)
+
+
+def test_sign_message_evm() -> None:
+    """EVM署名のテスト."""
+    # テスト用BSC秘密鍵（secp256k1）
+    private_key = "0x" + "b" * 64
+    message = "test message"
+
+    # 署名を生成
+    signature = sign_message_evm(private_key, message)
+
+    # 16進数形式であることを確認
+    assert isinstance(signature, str)
+    assert signature.startswith("0x")
+    # 署名は0x + 130文字（65バイト * 2）
+    assert len(signature) == 132
+
+
+def test_sign_message_evm_verification() -> None:
+    """EVM署名が検証可能であることを確認."""
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    # テスト用秘密鍵
+    private_key = "0x" + "b" * 64
+    message = "test message"
+
+    # 署名を生成
+    signature = sign_message_evm(private_key, message)
+
+    # アカウント作成
+    account = Account.from_key(private_key)
+
+    # メッセージハッシュ
+    message_hash = encode_defunct(text=message)
+
+    # 署名から公開鍵アドレスを復元
+    recovered_address = Account.recover_message(message_hash, signature=signature)
+
+    # 復元されたアドレスが元のアドレスと一致することを確認
+    assert recovered_address == account.address
+
+
+def test_sign_message_evm_consistency() -> None:
+    """同じ秘密鍵とメッセージで同じ署名が生成されることを確認."""
+    private_key = "0x" + "b" * 64
+    message = "test message"
+
+    sig1 = sign_message_evm(private_key, message)
+    sig2 = sign_message_evm(private_key, message)
+
+    # 同じ秘密鍵とメッセージなら同じ署名
+    assert sig1 == sig2
+
+
+def test_sign_message_evm_different_messages() -> None:
+    """異なるメッセージで異なる署名が生成されることを確認."""
+    private_key = "0x" + "b" * 64
+    message1 = "test message 1"
+    message2 = "test message 2"
+
+    sig1 = sign_message_evm(private_key, message1)
+    sig2 = sign_message_evm(private_key, message2)
+
+    # 異なるメッセージなら異なる署名
+    assert sig1 != sig2

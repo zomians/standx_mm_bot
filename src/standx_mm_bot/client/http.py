@@ -8,7 +8,11 @@ from typing import Any, cast
 import aiohttp
 import jwt as pyjwt
 
-from standx_mm_bot.auth import generate_auth_headers, sign_message, sign_message_solana
+from standx_mm_bot.auth import (
+    generate_auth_headers,
+    sign_message_evm,
+    sign_message_solana,
+)
 from standx_mm_bot.client.exceptions import (
     APIError,
     AuthenticationError,
@@ -100,14 +104,18 @@ class StandXHTTPClient:
             except Exception as e:
                 raise AuthenticationError(f"Failed to decode signedData: {e}") from e
 
-            # Solanaチェーンの場合は特殊な署名形式を使用
-            if self.config.standx_chain.lower() == "solana":
-                # inputはデコードされたpayload
+            # チェーン別の署名形式を使用
+            chain = self.config.standx_chain.lower()
+            if chain == "solana":
+                # Solana: JSON+Base64形式
                 signature = sign_message_solana(
                     self.config.standx_private_key, message, decoded_payload
                 )
+            elif chain == "bsc":
+                # BSC (EVM): 16進数署名
+                signature = sign_message_evm(self.config.standx_private_key, message)
             else:
-                signature = sign_message(self.config.standx_private_key, message)
+                raise AuthenticationError(f"Unsupported chain: {self.config.standx_chain}")
 
             # Step 3: login でJWTトークンを取得
             login_url = f"{self.auth_base_url}/v1/offchain/login?chain={self.config.standx_chain}"
@@ -167,10 +175,23 @@ class StandXHTTPClient:
         if self.jwt_token is None:
             raise RuntimeError("JWT token not initialized. Use 'async with' context manager.")
 
+        # チェーンに応じて適切な署名鍵を選択
+        # BSC: APIリクエスト署名用Ed25519鍵を使用（JWT認証とは別の鍵）
+        # Solana: ウォレット秘密鍵（Ed25519）を使用
+        if self.config.standx_chain.lower() == "bsc":
+            if not self.config.standx_request_signing_key:
+                raise RuntimeError(
+                    "BSC chain requires STANDX_REQUEST_SIGNING_KEY in .env. "
+                    "Generate wallet with: make wallet-bsc"
+                )
+            signing_key = self.config.standx_request_signing_key
+        else:
+            signing_key = self.config.standx_private_key
+
         # 認証ヘッダー生成（署名計算で使用したペイロード文字列も返される）
         headers, payload_str = generate_auth_headers(
             self.jwt_token,
-            self.config.standx_private_key,
+            signing_key,
             method,
             path,
             body,
