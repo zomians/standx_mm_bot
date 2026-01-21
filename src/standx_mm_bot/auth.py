@@ -139,9 +139,10 @@ def generate_request_signature(
     request_id = str(uuid.uuid4())
     timestamp = str(int(time.time() * 1000))  # ミリ秒
 
-    # payloadを構築（sort_keysでフィールド順序を保証）
+    # payloadを構築（辞書の挿入順序を保持）
+    # StandX APIは辞書の挿入順序を期待している可能性があるため、sort_keysは使用しない
     if method.upper() == "POST" and body:
-        payload = json.dumps(body, separators=(",", ":"), sort_keys=True)
+        payload = json.dumps(body, separators=(",", ":"))
     else:
         payload = ""
 
