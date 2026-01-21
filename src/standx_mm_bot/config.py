@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     ws_reconnect_interval: int = Field(5000, description="WebSocket再接続間隔 (ms)")
     jwt_expires_seconds: int = Field(604800, description="JWT有効期限 (秒, デフォルト7日)")
 
+    # 動作モード
+    dry_run: bool = Field(True, description="ドライランモード (True時は実注文なし、ログ出力のみ)")
+
     @field_validator("target_distance_bps")
     @classmethod
     def validate_target_distance(cls, v: float) -> float:
