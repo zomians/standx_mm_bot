@@ -1,4 +1,4 @@
-"""Data models for StandX MM Bot."""
+"""データモデル定義."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,21 +6,21 @@ from enum import Enum
 
 
 class Side(str, Enum):
-    """Order side."""
+    """注文サイド."""
 
     BUY = "BUY"
     SELL = "SELL"
 
 
 class OrderType(str, Enum):
-    """Order type."""
+    """注文タイプ."""
 
     LIMIT = "LIMIT"
     MARKET = "MARKET"
 
 
 class OrderStatus(str, Enum):
-    """Order status."""
+    """注文ステータス."""
 
     OPEN = "OPEN"
     FILLED = "FILLED"
@@ -29,16 +29,16 @@ class OrderStatus(str, Enum):
 
 
 class Action(str, Enum):
-    """Action to take on an order."""
+    """約定回避アクション."""
 
-    HOLD = "HOLD"  # Do nothing
-    ESCAPE = "ESCAPE"  # Move order away to avoid fill
-    REPOSITION = "REPOSITION"  # Move order to target position
+    HOLD = "HOLD"  # 現状維持
+    ESCAPE = "ESCAPE"  # 約定回避（キャンセルまたは外側に移動）
+    REPOSITION = "REPOSITION"  # 再配置
 
 
 @dataclass
 class Order:
-    """Order representation."""
+    """注文情報."""
 
     id: str
     symbol: str
@@ -53,7 +53,7 @@ class Order:
 
 @dataclass
 class Position:
-    """Position representation."""
+    """ポジション情報."""
 
     symbol: str
     side: Side
@@ -64,7 +64,7 @@ class Position:
 
 @dataclass
 class PriceUpdate:
-    """Price update from WebSocket."""
+    """価格更新情報."""
 
     symbol: str
     mark_price: float
@@ -74,7 +74,7 @@ class PriceUpdate:
 
 @dataclass
 class Trade:
-    """Trade (fill) representation."""
+    """約定情報."""
 
     id: str
     order_id: str

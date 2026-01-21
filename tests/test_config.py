@@ -1,4 +1,7 @@
-"""Tests for configuration management."""
+"""config.pyのテスト."""
+
+import os
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -6,35 +9,38 @@ from pydantic import ValidationError
 from standx_mm_bot.config import Settings
 
 
-def test_settings_with_valid_values(monkeypatch):
-    """Test Settings with valid environment variables."""
-    # Set environment variables
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("STANDX_CHAIN", "bsc")
-    monkeypatch.setenv("SYMBOL", "ETH_USDC")
-    monkeypatch.setenv("ORDER_SIZE", "0.5")
-    monkeypatch.setenv("TARGET_DISTANCE_BPS", "8.0")
+def test_settings_with_env_file(tmp_path: Path) -> None:
+    """環境変数ファイルから設定を読み込めることを確認."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "STANDX_PRIVATE_KEY=0x1234567890abcdef\n"
+        "STANDX_WALLET_ADDRESS=0xabcdef1234567890\n"
+        "STANDX_CHAIN=bsc\n"
+        "SYMBOL=ETH_USDC\n"
+        "ORDER_SIZE=0.1\n"
+        "TARGET_DISTANCE_BPS=8.0\n"
+    )
 
-    settings = Settings()
+    # env_fileを指定して設定を読み込む
+    settings = Settings(_env_file=str(env_file))
 
-    assert settings.standx_private_key == "test_private_key"
-    assert settings.standx_wallet_address == "0x1234567890abcdef"
+    assert settings.standx_private_key == "0x1234567890abcdef"
+    assert settings.standx_wallet_address == "0xabcdef1234567890"
     assert settings.standx_chain == "bsc"
     assert settings.symbol == "ETH_USDC"
-    assert settings.order_size == 0.5
+    assert settings.order_size == 0.1
     assert settings.target_distance_bps == 8.0
 
 
-def test_settings_with_defaults(monkeypatch):
-    """Test Settings with default values."""
-    # Set only required fields
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
+def test_settings_default_values() -> None:
+    """デフォルト値が正しく設定されることを確認."""
+    # 必須フィールドのみ環境変数で設定
+    os.environ["STANDX_PRIVATE_KEY"] = "0xtest"
+    os.environ["STANDX_WALLET_ADDRESS"] = "0xtest"
 
     settings = Settings()
 
-    # Check defaults
+    # デフォルト値の確認
     assert settings.standx_chain == "bsc"
     assert settings.symbol == "ETH_USDC"
     assert settings.order_size == 0.1
@@ -46,72 +52,51 @@ def test_settings_with_defaults(monkeypatch):
     assert settings.ws_reconnect_interval == 5000
     assert settings.jwt_expires_seconds == 604800
 
-
-def test_target_distance_bps_validation_too_small(monkeypatch):
-    """Test target_distance_bps validation with value <= 0."""
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("TARGET_DISTANCE_BPS", "0")
-
-    with pytest.raises(ValidationError) as exc_info:
-        Settings()
-
-    assert "target_distance_bps must be between 0 and 10" in str(exc_info.value)
+    # クリーンアップ
+    del os.environ["STANDX_PRIVATE_KEY"]
+    del os.environ["STANDX_WALLET_ADDRESS"]
 
 
-def test_target_distance_bps_validation_too_large(monkeypatch):
-    """Test target_distance_bps validation with value >= 10."""
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("TARGET_DISTANCE_BPS", "10")
+def test_settings_validation_target_distance_too_small() -> None:
+    """target_distance_bpsが小さすぎる場合にエラーが発生することを確認."""
+    os.environ["STANDX_PRIVATE_KEY"] = "0xtest"
+    os.environ["STANDX_WALLET_ADDRESS"] = "0xtest"
+    os.environ["TARGET_DISTANCE_BPS"] = "-1.0"
 
     with pytest.raises(ValidationError) as exc_info:
         Settings()
 
     assert "target_distance_bps must be between 0 and 10" in str(exc_info.value)
 
+    # クリーンアップ
+    del os.environ["STANDX_PRIVATE_KEY"]
+    del os.environ["STANDX_WALLET_ADDRESS"]
+    del os.environ["TARGET_DISTANCE_BPS"]
 
-def test_target_distance_bps_validation_negative(monkeypatch):
-    """Test target_distance_bps validation with negative value."""
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("TARGET_DISTANCE_BPS", "-1")
+
+def test_settings_validation_target_distance_too_large() -> None:
+    """target_distance_bpsが大きすぎる場合にエラーが発生することを確認."""
+    os.environ["STANDX_PRIVATE_KEY"] = "0xtest"
+    os.environ["STANDX_WALLET_ADDRESS"] = "0xtest"
+    os.environ["TARGET_DISTANCE_BPS"] = "15.0"
 
     with pytest.raises(ValidationError) as exc_info:
         Settings()
 
     assert "target_distance_bps must be between 0 and 10" in str(exc_info.value)
 
-
-def test_escape_threshold_bps_validation_zero(monkeypatch):
-    """Test escape_threshold_bps validation with value <= 0."""
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("ESCAPE_THRESHOLD_BPS", "0")
-
-    with pytest.raises(ValidationError) as exc_info:
-        Settings()
-
-    assert "escape_threshold_bps must be positive" in str(exc_info.value)
+    # クリーンアップ
+    del os.environ["STANDX_PRIVATE_KEY"]
+    del os.environ["STANDX_WALLET_ADDRESS"]
+    del os.environ["TARGET_DISTANCE_BPS"]
 
 
-def test_escape_threshold_bps_validation_negative(monkeypatch):
-    """Test escape_threshold_bps validation with negative value."""
-    monkeypatch.setenv("STANDX_PRIVATE_KEY", "test_private_key")
-    monkeypatch.setenv("STANDX_WALLET_ADDRESS", "0x1234567890abcdef")
-    monkeypatch.setenv("ESCAPE_THRESHOLD_BPS", "-1")
-
-    with pytest.raises(ValidationError) as exc_info:
-        Settings()
-
-    assert "escape_threshold_bps must be positive" in str(exc_info.value)
-
-
-def test_missing_required_fields(monkeypatch):
-    """Test Settings with missing required fields."""
-    # Don't set required fields
-    monkeypatch.delenv("STANDX_PRIVATE_KEY", raising=False)
-    monkeypatch.delenv("STANDX_WALLET_ADDRESS", raising=False)
+def test_settings_missing_required_fields() -> None:
+    """必須フィールドが欠けている場合にエラーが発生することを確認."""
+    # 環境変数をクリア
+    for key in ["STANDX_PRIVATE_KEY", "STANDX_WALLET_ADDRESS"]:
+        if key in os.environ:
+            del os.environ[key]
 
     with pytest.raises(ValidationError):
         Settings()

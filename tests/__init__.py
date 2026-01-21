@@ -1,1 +1,1 @@
-"""Tests for StandX MM Bot."""
+"""Tests for standx_mm_bot."""
