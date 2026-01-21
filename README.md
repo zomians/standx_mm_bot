@@ -125,6 +125,25 @@ make logs
 make down
 ```
 
+### 4. シンボル切り替え（オプション）
+
+ETH-USDとBTC-USDを簡単に切り替えできます。
+
+```bash
+# ETH-USDで起動
+make up-eth
+
+# BTC-USDで起動
+make up-btc
+
+# シンボルのみ切り替え（起動なし）
+make switch-eth
+make switch-btc
+
+# 現在の設定確認
+make config
+```
+
 ---
 
 ## ディレクトリ構成
@@ -177,6 +196,9 @@ StandX APIのデータを確認するためのツールコマンドです：
 # ウォレット作成（初回のみ）
 make wallet
 
+# 現在の設定確認
+make config
+
 # 現在の価格を取得
 make price
 
@@ -191,6 +213,22 @@ make balance
 
 # すべてのステータスを取得
 make status
+```
+
+### シンボル切り替え
+
+```bash
+# ETH-USDに切り替え
+make switch-eth
+
+# BTC-USDに切り替え
+make switch-btc
+
+# ETH-USDで起動
+make up-eth
+
+# BTC-USDで起動
+make up-btc
 ```
 
 ### 開発環境

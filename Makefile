@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position balance status
+.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position balance status switch-eth switch-btc up-eth up-btc config
 
 # 開発環境: Bot起動
 up:
@@ -84,3 +84,32 @@ balance:
 status:
 	@echo "Fetching all status..."
 	docker compose run --rm bot python scripts/read_api.py status
+
+# シンボル切り替え: ETH-USD
+switch-eth:
+	@if [ ! -f .env ]; then echo "Error: .env file not found. Run 'cp .env.example .env' first."; exit 1; fi
+	@sed -i.bak 's/^SYMBOL=.*/SYMBOL=ETH-USD/' .env && rm -f .env.bak
+	@echo "✅ Switched to ETH-USD"
+	@grep "^SYMBOL=" .env
+
+# シンボル切り替え: BTC-USD
+switch-btc:
+	@if [ ! -f .env ]; then echo "Error: .env file not found. Run 'cp .env.example .env' first."; exit 1; fi
+	@sed -i.bak 's/^SYMBOL=.*/SYMBOL=BTC-USD/' .env && rm -f .env.bak
+	@echo "✅ Switched to BTC-USD"
+	@grep "^SYMBOL=" .env
+
+# ETH-USDで起動
+up-eth: switch-eth up
+
+# BTC-USDで起動
+up-btc: switch-btc up
+
+# 現在の設定確認（秘密鍵・アドレスは表示しない）
+config:
+	@echo "=== Current Configuration ==="
+	@if [ -f .env ]; then \
+		cat .env | grep -v "PRIVATE_KEY\|WALLET_ADDRESS" | grep -v "^#" | grep -v "^$$"; \
+	else \
+		echo "Error: .env file not found"; \
+	fi
