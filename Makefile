@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position status
+.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet price orders position balance status
 
 # 開発環境: Bot起動
 up:
@@ -76,6 +76,10 @@ orders:
 position:
 	@echo "Fetching current position..."
 	docker compose run --rm bot python scripts/read_api.py position
+
+balance:
+	@echo "Fetching balance (StandX + Solana)..."
+	docker compose run --rm bot python scripts/read_api.py balance
 
 status:
 	@echo "Fetching all status..."
