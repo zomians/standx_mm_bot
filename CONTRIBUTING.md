@@ -44,6 +44,7 @@ StandX MM Bot プロジェクトへようこそ！このガイドでは、プロ
 
 ## 目次
 
+- [開発環境セットアップ](#開発環境セットアップ)
 - [Issue 作成ガイドライン](#issue-作成ガイドライン)
 - [Git ワークフロー](#git-ワークフロー)
 - [コミット規約](#コミット規約)
@@ -51,6 +52,106 @@ StandX MM Bot プロジェクトへようこそ！このガイドでは、プロ
 - [コーディング規約](#コーディング規約)
 - [テスト方針](#テスト方針)
 - [コードレビュー基準](#コードレビュー基準)
+
+---
+
+## 開発環境セットアップ
+
+### 前提条件
+
+このプロジェクトは**Dockerベース**で動作します。以下がインストールされていることを確認してください：
+
+- **Docker** (最新版推奨)
+- **Docker Compose V2**
+- **Git**
+
+**重要**: ローカルにPython環境をインストールする必要はありません。
+すべての開発作業（テスト、Lint、型チェック、実行）はDockerコンテナ内で行われます。
+
+### セットアップ手順
+
+```bash
+# 1. リポジトリクローン
+git clone https://github.com/zomians/standx_mm_bot.git
+cd standx_mm_bot
+
+# 2. Docker環境確認
+docker --version          # Docker 20.10+
+docker compose version    # Docker Compose V2
+
+# 3. 環境変数設定
+cp .env.example .env
+# .envを編集してウォレット情報を設定
+
+# 4. 動作確認（テスト実行）
+make test
+```
+
+### Docker開発環境の理解
+
+#### すべてのコマンドがDockerで実行される
+
+```bash
+make test
+# ↓ 実際には以下を実行
+docker compose run --rm bot pytest
+```
+
+各`make`コマンドは内部で`docker compose run --rm bot <command>`を実行します：
+
+- `docker compose run`: 一時的にコンテナを起動
+- `--rm`: 実行後にコンテナを自動削除
+- `bot`: `compose.yaml`で定義されたサービス名
+- `<command>`: コンテナ内で実行するコマンド（`pytest`, `mypy`, `ruff`など）
+
+#### ボリュームマウント（コード同期）
+
+`compose.yaml`では以下のように設定されています：
+
+```yaml
+volumes:
+  - .:/app:rw
+```
+
+これにより、ローカルのプロジェクトルート（`.`）がコンテナ内の`/app`にマウントされます。
+
+**つまり**:
+- ローカルでファイルを編集 → 即座にコンテナ内に反映
+- コンテナ内で生成されたファイル → ローカルにも反映
+- **ローカルにPython環境不要** → すべてコンテナ内で完結
+
+#### 開発ステージと本番ステージ
+
+`Dockerfile`ではマルチステージビルドを使用しています：
+
+```dockerfile
+# 開発ステージ (target: dev)
+FROM python:3.12-slim as dev
+RUN pip install -e ".[dev]"  # テスト/Lint/型チェックツール含む
+```
+
+開発時は`compose.yaml`の`target: dev`により、テストツール等がすべてインストールされた開発用イメージが使用されます。
+
+### よく使う開発コマンド
+
+```bash
+# テスト実行
+make test
+
+# 型チェック
+make typecheck
+
+# Lint
+make lint
+
+# フォーマット
+make format
+
+# 全チェック (format + lint + typecheck + test)
+make check
+```
+
+これらすべてがDockerコンテナ内で実行されます。ローカルにpytest、mypy、ruffなどをインストールする必要はありません。
 
 ---
 
