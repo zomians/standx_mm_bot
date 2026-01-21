@@ -1,0 +1,8 @@
+services:
+  bot:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro

@@ -493,7 +493,7 @@ issue#2のWebSocket接続機能を実装しました。
 
 ## テスト方法
 ```bash
-python -m pytest tests/test_websocket.py
+make test
 ```
 
 ## チェックリスト

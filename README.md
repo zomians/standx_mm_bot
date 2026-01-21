@@ -75,12 +75,9 @@ StandX は「板に居続けること」に報酬が出る Perp DEX。このBot�
 git clone https://github.com/zomians/standx_mm_bot.git
 cd standx_mm_bot
 
-# 仮想環境作成
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 依存関係インストール
-pip install -e ".[dev]"
+# Docker と Docker Compose がインストールされていることを確認
+docker --version
+docker compose version
 ```
 
 ### 2. 環境変数設定
@@ -108,10 +105,13 @@ ESCAPE_THRESHOLD_BPS=3        # この距離まで近づいたら逃げる
 
 ```bash
 # Bot 起動
-python -m standx_mm_bot
+make up
 
-# または
-make run
+# ログ確認
+make logs
+
+# Bot 停止
+make down
 ```
 
 ---
@@ -151,11 +151,17 @@ standx_mm_bot/
 
 ## よく使うコマンド
 
-### 開発
+### 開発環境
 
 ```bash
 # Bot 起動
-make run
+make up
+
+# Bot 停止
+make down
+
+# ログ確認
+make logs
 
 # テスト実行
 make test
@@ -171,6 +177,22 @@ make format
 
 # 全チェック (lint + typecheck + test)
 make check
+
+# クリーンアップ
+make clean
+```
+
+### 本番環境
+
+```bash
+# イメージビルド
+make build-prod
+
+# Bot 起動
+make up-prod
+
+# Bot 再起動
+make restart-prod
 ```
 
 ### Git
