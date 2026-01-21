@@ -1,4 +1,4 @@
-"""HTTPクライアントモジュール."""
+"""クライアントモジュール."""
 
 from standx_mm_bot.client.exceptions import (
     APIError,
@@ -6,9 +6,11 @@ from standx_mm_bot.client.exceptions import (
     NetworkError,
 )
 from standx_mm_bot.client.http import StandXHTTPClient
+from standx_mm_bot.client.websocket import StandXWebSocketClient
 
 __all__ = [
     "StandXHTTPClient",
+    "StandXWebSocketClient",
     "APIError",
     "AuthenticationError",
     "NetworkError",
