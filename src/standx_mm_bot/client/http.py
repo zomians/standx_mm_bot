@@ -102,7 +102,7 @@ class StandXHTTPClient:
                     error_text = await resp.text()
                     raise APIError(f"HTTP {resp.status}: {error_text}")
         except aiohttp.ClientError as e:
-            raise NetworkError(f"Network error: {e}")
+            raise NetworkError(f"Network error: {e}") from e
 
     async def get_symbol_price(self, symbol: str) -> dict[str, Any]:
         """

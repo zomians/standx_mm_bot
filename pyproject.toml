@@ -27,7 +27,7 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.2",
     "aioresponses>=0.7",
-    "eth-account>=0.11",
+    "base58>=2.1",
 ]
 
 [project.scripts]

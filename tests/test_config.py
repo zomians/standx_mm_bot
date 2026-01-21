@@ -41,7 +41,7 @@ def test_settings_default_values() -> None:
     settings = Settings()
 
     # デフォルト値の確認
-    assert settings.standx_chain == "bsc"
+    assert settings.standx_chain == "solana"
     assert settings.symbol == "ETH_USDC"
     assert settings.order_size == 0.1
     assert settings.target_distance_bps == 8.0
@@ -98,5 +98,6 @@ def test_settings_missing_required_fields() -> None:
         if key in os.environ:
             del os.environ[key]
 
+    # _env_file=Noneで.envファイルを無視
     with pytest.raises(ValidationError):
-        Settings()
+        Settings(_env_file=None)

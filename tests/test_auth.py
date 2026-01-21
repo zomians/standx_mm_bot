@@ -165,9 +165,7 @@ def test_private_key_with_0x_prefix() -> None:
     token_without_prefix = generate_jwt(private_key_without_prefix, wallet_address, chain)
 
     payload_with_prefix = jwt.decode(token_with_prefix, options={"verify_signature": False})
-    payload_without_prefix = jwt.decode(
-        token_without_prefix, options={"verify_signature": False}
-    )
+    payload_without_prefix = jwt.decode(token_without_prefix, options={"verify_signature": False})
 
     # wallet_addressとchainは同じはず
     assert payload_with_prefix["wallet_address"] == payload_without_prefix["wallet_address"]

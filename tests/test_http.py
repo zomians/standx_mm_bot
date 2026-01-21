@@ -8,7 +8,6 @@ from aioresponses import aioresponses
 from standx_mm_bot.client import (
     APIError,
     AuthenticationError,
-    NetworkError,
     StandXHTTPClient,
 )
 from standx_mm_bot.config import Settings
