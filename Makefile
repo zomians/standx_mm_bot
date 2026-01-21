@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format check logs clean build-prod up-prod restart-prod
+.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet
 
 # 開発環境: Bot起動
 up:
@@ -29,8 +29,12 @@ format:
 	docker compose run --rm bot ruff format src tests
 	docker compose run --rm bot ruff check --fix src tests
 
-# 全チェック (lint + typecheck + test)
-check: lint typecheck test
+# フォーマットチェック（修正なし）
+format-check:
+	docker compose run --rm bot ruff format --check src tests
+
+# 全チェック (format-check + lint + typecheck + test-cov)
+check: format-check lint typecheck test-cov
 
 # ログ確認
 logs:
@@ -54,3 +58,8 @@ up-prod:
 # 本番環境: Bot再起動
 restart-prod:
 	docker compose -f compose.prod.yaml restart
+
+# ウォレット作成と.env生成
+wallet:
+	@echo "Creating new Solana wallet and generating .env file..."
+	docker compose run --rm bot python scripts/create_wallet.py

@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     # 認証
     standx_private_key: str = Field(..., description="ウォレット秘密鍵")
     standx_wallet_address: str = Field(..., description="ウォレットアドレス")
-    standx_chain: str = Field("bsc", description="チェーン (bsc or solana)")
+    standx_chain: str = Field("solana", description="チェーン (bsc or solana)")
 
     # 取引設定
-    symbol: str = Field("ETH_USDC", description="取引ペア")
+    symbol: str = Field("ETH-USD", description="取引ペア")
     order_size: float = Field(0.1, description="片側注文サイズ")
 
     # 距離設定 (bps)
@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # 接続設定
     ws_reconnect_interval: int = Field(5000, description="WebSocket再接続間隔 (ms)")
     jwt_expires_seconds: int = Field(604800, description="JWT有効期限 (秒, デフォルト7日)")
+
+    # 動作モード
+    dry_run: bool = Field(True, description="ドライランモード (True時は実注文なし、ログ出力のみ)")
 
     @field_validator("target_distance_bps")
     @classmethod

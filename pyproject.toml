@@ -27,6 +27,7 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.2",
     "aioresponses>=0.7",
+    "base58>=2.1",
 ]
 
 [project.scripts]
@@ -75,6 +76,9 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (require real API access)",
+]
 
 [tool.coverage.run]
 source = ["src/standx_mm_bot"]
