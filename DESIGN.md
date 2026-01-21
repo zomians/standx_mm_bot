@@ -198,6 +198,41 @@ strategy/maker.py
 
 ## 実装フェーズ
 
+### Phase 0: 事前準備 (Prerequisites)
+
+**目的**: ウォレット生成、チェーン統一、開発環境整備
+
+**実装項目**:
+
+1. **scripts/create_wallet.py**
+   - Ed25519鍵ペア生成（PyNaCl使用）
+   - .envファイル自動生成
+   - セキュリティ対策（パーミッション600）
+   - Solanaアドレス形式（Base58）
+
+2. **Makefileコマンド**
+   - `make wallet`: ウォレット自動生成
+
+3. **BSC → Solana統一**
+   - auth.pyはEd25519専用で実装済み
+   - ウォレット生成もEd25519に統一
+   - 設定のデフォルトを `solana` に変更
+
+**受け入れ基準**:
+- [x] `make wallet` でSolanaウォレット生成
+- [x] .envファイルに秘密鍵とアドレスを自動書き込み
+- [x] 既存.envファイルは保護（上書きしない）
+- [x] パーミッション600でセキュア
+- [x] auth.pyとの整合性確保（Ed25519統一）
+
+**工数見積**: 4時間
+
+**実装履歴**:
+- Issue #14（Phase 2-1）の一部として実装完了
+- BSCからSolanaへの統一も同時に実施
+
+---
+
 ### Phase 1: 基盤 (Foundation)
 
 **目的**: 設定管理、データモデル、認証の基盤を構築
@@ -261,12 +296,25 @@ strategy/maker.py
    - 認証 (order, trade チャンネル)
 
 **受け入れ基準**:
-- [ ] HTTP クライアントで全エンドポイント呼び出し可能
+- [x] HTTP クライアントで全エンドポイント呼び出し可能
 - [ ] WebSocket で price, order, trade を受信できる
 - [ ] 自動再接続が動作する
-- [ ] 統合テスト: REST API, WebSocket
+- [x] 統合テスト: REST API（モック使用）
+- [ ] 統合テスト: WebSocket
 
 **工数見積**: 10時間
+
+**実装履歴**:
+- **Phase 2-1 (client/http.py)**: Issue #14で実装完了
+  - 全エンドポイント実装
+  - 認証ヘッダー自動付与
+  - エラーハンドリング（401, 429リトライ）
+  - ドライランモード対応
+  - ユニットテスト12件、統合テスト4件
+  - **追加実装**: ウォレット自動生成（scripts/create_wallet.py）
+  - **追加実装**: BSC→Solana統一
+  - **追加実装**: API読み取りツール（scripts/read_api.py、Issue #34）
+- **Phase 2-2 (client/websocket.py)**: Issue #15（未実装）
 
 ---
 
@@ -447,6 +495,8 @@ strategy/maker.py
 ### フェーズ間の依存関係
 
 ```
+Phase 0 (事前準備)
+    ↓
 Phase 1 (基盤)
     ↓
 Phase 2 (API クライアント)
@@ -700,7 +750,7 @@ async def execute_hold():
 | **認証** | | | |
 | private_key | `STANDX_PRIVATE_KEY` | (必須) | ウォレット秘密鍵 |
 | wallet_address | `STANDX_WALLET_ADDRESS` | (必須) | ウォレットアドレス |
-| chain | `STANDX_CHAIN` | `bsc` | チェーン (bsc/solana) |
+| chain | `STANDX_CHAIN` | `solana` | チェーン (solana/bsc) |
 | **取引設定** | | | |
 | symbol | `SYMBOL` | `ETH_USDC` | 取引ペア |
 | order_size | `ORDER_SIZE` | `0.1` | 片側注文サイズ |
@@ -724,9 +774,9 @@ class Settings(BaseSettings):
     """Bot 設定"""
 
     # 認証
-    standx_private_key: str = Field(..., description="ウォレット秘密鍵")
-    standx_wallet_address: str = Field(..., description="ウォレットアドレス")
-    standx_chain: str = Field("bsc", description="チェーン (bsc/solana)")
+    standx_private_key: str = Field(..., description="ウォレット秘密鍵（Ed25519、hex形式）")
+    standx_wallet_address: str = Field(..., description="ウォレットアドレス（Solana: Base58形式）")
+    standx_chain: str = Field("solana", description="チェーン (solana/bsc)")
 
     # 取引設定
     symbol: str = Field("ETH_USDC", description="取引ペア")
