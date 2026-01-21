@@ -4,7 +4,7 @@ services:
       context: .
       target: dev
     volumes:
-      - ./src:/app/src:ro
-      - ./tests:/app/tests:ro
+      - .:/app:rw
+    working_dir: /app
     environment:
       - PYTHONPATH=/app/src

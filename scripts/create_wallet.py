@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""BSCウォレットを作成し、.envファイルを生成する."""
+
+import os
+import sys
+from pathlib import Path
+
+try:
+    from eth_account import Account
+except ImportError:
+    print("Error: eth-account is not installed.")
+    print("Install with: pip install eth-account")
+    sys.exit(1)
+
+
+def create_wallet() -> tuple[str, str]:
+    """
+    新しいBSCウォレットを作成.
+
+    Returns:
+        tuple[str, str]: (private_key, address)
+    """
+    account = Account.create()
+    private_key = account.key.hex()
+    address = account.address
+    return private_key, address
+
+
+def create_env_file(private_key: str, address: str) -> None:
+    """
+    .envファイルを作成.
+
+    Args:
+        private_key: 秘密鍵
+        address: ウォレットアドレス
+    """
+    # プロジェクトルートのパス
+    project_root = Path(__file__).parent.parent
+    env_example_path = project_root / ".env.example"
+    env_path = project_root / ".env"
+
+    # .envが既に存在し、空でない場合は上書きしない
+    if env_path.exists():
+        # ファイルサイズをチェック
+        file_size = env_path.stat().st_size
+        if file_size > 0:
+            print(f"\n⚠️  .env file already exists: {env_path}")
+            print("Will not overwrite existing .env file.")
+            print("To create a new wallet, delete .env first: rm .env")
+            sys.exit(0)
+        # 空ファイルの場合は上書きを許可
+        print(f"\n📝 Empty .env file found, will overwrite...")
+
+    # .env.exampleを読み込み
+    if not env_example_path.exists():
+        print(f"Error: .env.example not found at {env_example_path}")
+        sys.exit(1)
+
+    with open(env_example_path) as f:
+        content = f.read()
+
+    # 秘密鍵とアドレスを埋め込む
+    content = content.replace("STANDX_PRIVATE_KEY=0x...", f"STANDX_PRIVATE_KEY={private_key}")
+    content = content.replace(
+        "STANDX_WALLET_ADDRESS=0x...", f"STANDX_WALLET_ADDRESS={address}"
+    )
+
+    # .envファイルを書き込み
+    with open(env_path, "w") as f:
+        f.write(content)
+
+    # パーミッションを600に設定（所有者のみ読み書き可能）
+    os.chmod(env_path, 0o600)
+
+    print(f"\n✅ .env file created: {env_path}")
+
+
+def main() -> None:
+    """メイン処理."""
+    print("=" * 60)
+    print("BSC Wallet Generator")
+    print("=" * 60)
+
+    # ウォレット作成
+    print("\n🔐 Generating new BSC wallet...")
+    private_key, address = create_wallet()
+
+    # 結果を表示
+    print("\n" + "=" * 60)
+    print("⚠️  IMPORTANT: Save this information securely!")
+    print("=" * 60)
+    print(f"\nWallet Address: {address}")
+    print(f"Private Key:    {private_key}")
+    print("\n" + "=" * 60)
+    print("⚠️  Security Warnings:")
+    print("=" * 60)
+    print("1. NEVER commit .env file to Git")
+    print("2. NEVER share your private key")
+    print("3. Use this wallet for TESTING ONLY")
+    print("4. Keep only small amounts of BNB for gas fees")
+    print("=" * 60)
+
+    # .envファイルを作成
+    print("\n📝 Creating .env file...")
+    create_env_file(private_key, address)
+
+    print("\n✅ Setup complete!")
+    print("\nNext steps:")
+    print("1. Deposit small amount of BNB for gas fees (0.01 BNB)")
+    print("2. Review .env file and adjust settings if needed")
+    print("3. Run: make test")
+    print()
+
+
+if __name__ == "__main__":
+    main()

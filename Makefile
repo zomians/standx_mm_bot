@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format check logs clean build-prod up-prod restart-prod
+.PHONY: up down test test-cov typecheck lint format check logs clean build-prod up-prod restart-prod wallet
 
 # 開発環境: Bot起動
 up:
@@ -54,3 +54,8 @@ up-prod:
 # 本番環境: Bot再起動
 restart-prod:
 	docker compose -f compose.prod.yaml restart
+
+# ウォレット作成と.env生成
+wallet:
+	@echo "Creating new BSC wallet and generating .env file..."
+	docker compose run --rm bot python scripts/create_wallet.py
