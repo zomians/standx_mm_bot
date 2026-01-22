@@ -151,7 +151,7 @@ src/standx_mm_bot/
 │   │       - 約定検知 (trade WebSocket)
 │   │       - 即座に成行でポジションクローズ
 │   │       - ポジションゼロ確認
-│   │       - 両サイド再設置
+│   │       - エラーログ出力 → Bot終了
 │   │
 │   └── distance.py            # bps 計算・閾値判定
 │       └── 責務:
@@ -368,7 +368,7 @@ strategy/maker.py
 4. **core/risk.py**
    - 厳格モード (約定後ポジションクローズ)
    - `close_position_immediately()` 実装
-   - 両サイド再設置ロジック
+   - Bot終了ロジック (sys.exit)
 
 **受け入れ基準**:
 - [ ] distance.py で bps 計算が正確
@@ -423,8 +423,9 @@ strategy/maker.py
          if trade_data["my_trade"]:
              # 即座にポジションクローズ
              await self.risk_manager.close_position_immediately()
-             # 両サイド再設置
-             await self.reset_both_sides()
+             # Bot終了（約定 = 失敗）
+             logger.error("Bot stopped due to trade execution.")
+             sys.exit(1)
      ```
 
 2. **__main__.py**
@@ -996,11 +997,14 @@ class OrderManager:
 async def on_trade(self, trade_data):
     """
     約定検知時の処理（厳格モード）
+
+    約定 = 失敗
+    → ポジションクローズ → ログ出力 → Bot終了
     """
     if not trade_data.get("my_trade"):
         return  # 自分の約定でない場合は無視
 
-    logger.warning(f"Trade detected: {trade_data}")
+    logger.error(f"CRITICAL: Trade executed! Design failure detected: {trade_data}")
 
     # 何よりも先にポジションクローズ
     await self.risk_manager.close_position_immediately()
@@ -1012,8 +1016,12 @@ async def on_trade(self, trade_data):
         # リトライロジック
         await self.risk_manager.close_position_immediately()
 
-    # 両サイド再設置
-    await self.reset_both_sides()
+    # Bot終了（自動復帰しない）
+    logger.error(
+        "Bot stopped due to trade execution. "
+        "Check parameters (ESCAPE_THRESHOLD_BPS, etc.) and restart manually."
+    )
+    sys.exit(1)
 ```
 
 **close_position_immediately() の実装**:
@@ -1044,7 +1052,7 @@ async def close_position_immediately(self):
 **注意**:
 - 成行注文は手数料が発生する（テイカー手数料）
 - しかし建玉リスク（FR、清算）を避けるために必要
-- 約定後は両サイドの注文を再設置する
+- ポジションクローズ後、Bot は終了する（約定 = 失敗）
 
 ---
 

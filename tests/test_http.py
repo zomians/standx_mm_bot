@@ -22,20 +22,6 @@ def config() -> Settings:
         standx_chain="bsc",
         symbol="ETH_USDC",
         order_size=0.1,
-        dry_run=False,  # テストではドライラン無効
-    )
-
-
-@pytest.fixture
-def dry_run_config() -> Settings:
-    """ドライランモード用設定を生成."""
-    return Settings(
-        standx_private_key="0x" + "a" * 64,
-        standx_wallet_address="0x1234567890abcdef",
-        standx_chain="bsc",
-        symbol="ETH_USDC",
-        order_size=0.1,
-        dry_run=True,  # ドライラン有効
     )
 
 
@@ -72,24 +58,6 @@ async def test_get_symbol_price(config: Settings) -> None:
 
 
 @pytest.mark.asyncio
-async def test_new_order_dry_run(dry_run_config: Settings) -> None:
-    """ドライランモードで注文発注がモックされることを確認."""
-    async with StandXHTTPClient(dry_run_config, jwt_token="test_jwt_token") as client:
-        response = await client.new_order(
-            symbol="ETH_USDC",
-            side="BUY",
-            price=3500.0,
-            size=0.1,
-        )
-
-    # ドライランモードではモックレスポンスが返される
-    assert response["order_id"] == "dry_run_order_id"
-    assert response["symbol"] == "ETH_USDC"
-    assert response["side"] == "BUY"
-    assert response["status"] == "OPEN"
-
-
-@pytest.mark.asyncio
 async def test_new_order(config: Settings) -> None:
     """注文発注が正しく動作することを確認."""
     with aioresponses() as mocked:
@@ -117,20 +85,6 @@ async def test_new_order(config: Settings) -> None:
 
         assert response["order_id"] == "order_123"
         assert response["status"] == "OPEN"
-
-
-@pytest.mark.asyncio
-async def test_cancel_order_dry_run(dry_run_config: Settings) -> None:
-    """ドライランモードで注文キャンセルがモックされることを確認."""
-    async with StandXHTTPClient(dry_run_config, jwt_token="test_jwt_token") as client:
-        response = await client.cancel_order(
-            order_id="order_123",
-            symbol="ETH_USDC",
-        )
-
-    # ドライランモードではモックレスポンスが返される
-    assert response["order_id"] == "order_123"
-    assert response["status"] == "CANCELED"
 
 
 @pytest.mark.asyncio

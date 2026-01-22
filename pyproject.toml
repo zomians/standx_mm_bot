@@ -77,9 +77,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not integration'"
 markers = [
-    "integration: marks tests as integration tests (require real API access)",
+    "integration: marks tests as integration tests (require real API access, excluded by default)",
 ]
 
 [tool.coverage.run]

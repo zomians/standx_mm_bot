@@ -269,22 +269,6 @@ class StandXHTTPClient:
         Returns:
             dict: 注文情報
         """
-        if self.config.dry_run:
-            logger.info(
-                f"[DRY RUN] new_order: symbol={symbol}, side={side}, "
-                f"price={price}, size={size}, type={order_type}"
-            )
-            # ドライランモード: モックレスポンスを返す
-            return {
-                "order_id": "dry_run_order_id",
-                "symbol": symbol,
-                "side": side,
-                "price": str(price),
-                "qty": str(size),
-                "order_type": order_type,
-                "status": "OPEN",
-            }
-
         # API仕様に従ったボディ構築
         body = {
             "symbol": symbol,
@@ -308,15 +292,6 @@ class StandXHTTPClient:
         Returns:
             dict: キャンセル結果
         """
-        if self.config.dry_run:
-            logger.info(f"[DRY RUN] cancel_order: order_id={order_id}, symbol={symbol}")
-            # ドライランモード: モックレスポンスを返す
-            return {
-                "order_id": order_id,
-                "symbol": symbol,
-                "status": "CANCELED",
-            }
-
         body = {"order_id": order_id, "symbol": symbol}
         return await self._request("POST", "/api/cancel_order", body)
 

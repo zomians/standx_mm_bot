@@ -155,20 +155,23 @@ await place_order(new_price)
 
 現実的には、急激な価格変動や遅延により、約定を完全に避けることは不可能です。
 
-**対処法**: 約定検知 → **即成行でクローズ** → 建玉ゼロに戻す
+**対処法**: 約定検知 → **即成行でクローズ** → **Bot終了**
 
 ```python
 if order.status == "FILLED":
     # 最優先: ポジションをゼロに
     await close_position_immediately()
 
-    # 両側の注文を再設置
-    await place_both_sides()
+    # 約定 = 失敗 → Bot終了
+    logger.error("Bot stopped due to trade execution.")
+    sys.exit(1)
 ```
 
 **トレードオフ**:
 - ✅ 建玉リスクをゼロに維持
+- ✅ 連続約定を防止
 - ❌ 手数料が発生（テイカー手数料）
+- ❌ 人間の介入が必要（パラメータ見直し）
 
 しかし、建玉を放置するリスク（FR、清算）に比べれば、手数料は許容範囲内です。
 

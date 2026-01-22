@@ -17,7 +17,9 @@ class Settings(BaseSettings):
 
     # 取引設定
     symbol: str = Field("ETH-USD", description="取引ペア")
-    order_size: float = Field(0.1, description="片側注文サイズ")
+    order_size: float = Field(
+        0.001, description="片側注文サイズ（推奨: 0.001固定、増やす必要なし）"
+    )
 
     # 距離設定 (bps)
     target_distance_bps: float = Field(8.0, description="目標距離 (bps)")
@@ -29,9 +31,6 @@ class Settings(BaseSettings):
     # 接続設定
     ws_reconnect_interval: int = Field(5000, description="WebSocket再接続間隔 (ms)")
     jwt_expires_seconds: int = Field(604800, description="JWT有効期限 (秒, デフォルト7日)")
-
-    # 動作モード
-    dry_run: bool = Field(True, description="ドライランモード (True時は実注文なし、ログ出力のみ)")
 
     @field_validator("target_distance_bps")
     @classmethod
