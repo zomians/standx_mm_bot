@@ -1,4 +1,4 @@
-.PHONY: up down test test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet wallet-bsc wallet-solana price orders position balance status switch-eth switch-btc up-eth up-btc config
+.PHONY: up down test test-integration test-all test-cov typecheck lint format format-check check logs clean build-prod up-prod restart-prod wallet wallet-bsc wallet-solana price orders position balance status switch-eth switch-btc up-eth up-btc config
 
 # 開発環境: Bot起動
 up:
@@ -8,13 +8,21 @@ up:
 down:
 	docker compose down
 
-# テスト実行
+# テスト実行（統合テスト除外、ガス代ゼロ）
 test:
+	docker compose run --rm bot pytest -m "not integration"
+
+# 統合テスト（実APIを使用、手動実行推奨）
+test-integration:
+	docker compose run --rm bot pytest -m integration
+
+# 全テスト（統合テスト含む）
+test-all:
 	docker compose run --rm bot pytest
 
-# テスト (カバレッジ付き)
+# テスト (カバレッジ付き、統合テスト除外)
 test-cov:
-	docker compose run --rm bot pytest --cov --cov-report=term-missing
+	docker compose run --rm bot pytest -m "not integration" --cov --cov-report=term-missing
 
 # 型チェック
 typecheck:

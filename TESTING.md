@@ -11,10 +11,8 @@ StandX MM Bot の安全なテスト手順と運用ガイド。
 - [概要](#概要)
 - [前提条件](#前提条件)
 - [Phase 1: 環境準備](#phase-1-環境準備)
-- [Phase 2: DRY_RUNテスト](#phase-2-dry_runテスト)
-- [Phase 2.5: 小額本番テスト](#phase-25-小額本番テスト)
-- [Phase 3: 本番起動](#phase-3-本番起動)
-- [Phase 4: 監視・運用](#phase-4-監視運用)
+- [Phase 2: 本番起動（段階的）](#phase-2-本番起動段階的)
+- [Phase 3: 監視・運用](#phase-3-監視運用)
 - [トラブルシューティング](#トラブルシューティング)
 - [FAQ](#faq)
 
@@ -24,21 +22,17 @@ StandX MM Bot の安全なテスト手順と運用ガイド。
 
 このガイドでは、StandX MM Botを安全にテスト・運用するための手順を説明します。
 
-### テストの重要性
+### 段階的アプローチ
 
-**なぜDRY_RUNテストが必要か:**
+**最初は小さく、安定したら増やす**
 
-- ❌ 設定ミスによる想定外の注文
-- ❌ 資金不足による注文失敗
-- ❌ API接続エラーによる動作不良
-- ❌ 約定回避ロジックの未検証
-
-**DRY_RUNモードなら:**
-
-- ✅ 実際の注文は発注されない
-- ✅ ログでロジックを確認できる
-- ✅ 設定ミスを事前に発見できる
-- ✅ リスクゼロで動作確認できる
+```
+ステップ1: ORDER_SIZE=0.001で開始（リスク ~$7）
+    ↓ 1時間動作確認
+ステップ2: ORDER_SIZE=0.01に増やす（リスク ~$70）
+    ↓ 1日動作確認
+ステップ3: さらに増やす（オプション）
+```
 
 ### テストフロー全体図
 
@@ -48,23 +42,13 @@ Phase 1: 環境準備
 ├─ 残高確認
 └─ 設定ファイル確認
     ↓
-Phase 2: DRY_RUNテスト（シミュレーション）
-├─ DRY_RUN=True設定
-├─ Bot起動・動作確認
-└─ ログ分析（実注文なし）
+Phase 2: 本番起動（段階的）
+├─ 2.1 初回起動（ORDER_SIZE=0.001）
+├─ 2.2 動作確認（1時間）
+├─ 2.3 ORDER_SIZE増加（0.01）
+└─ 2.4 安定稼働
     ↓
-Phase 2.5: 小額本番テスト（実API検証）← 重要！
-├─ ORDER_SIZE=0.001設定（最小値）
-├─ DRY_RUN=False設定
-├─ 実際の注文発注・キャンセル
-└─ API動作検証（リスク最小）
-    ↓
-Phase 3: 本番起動（通常サイズ）
-├─ 最終チェック
-├─ ORDER_SIZE=0.01設定（推奨）
-└─ 本番運用開始
-    ↓
-Phase 4: 監視・運用
+Phase 3: 監視・運用
 ├─ ログ監視
 ├─ 異常検知
 └─ 定期メンテナンス
@@ -86,18 +70,18 @@ Phase 4: 監視・運用
 
 ### 推奨環境
 
-| 項目 | Phase 2.5（小額テスト） | Phase 3（本番運用） |
-|------|------------------------|---------------------|
-| BNB残高 | 0.005 BNB以上（~$3） | 0.005 BNB以上（~$3） |
-| DUSD残高 | 10 DUSD以上 | 100 DUSD以上 |
-| ORDER_SIZE | 0.001（最小値） | 0.01-0.02（推奨） |
+| 項目 | ORDER_SIZE=0.001 | ORDER_SIZE=0.01 | ORDER_SIZE=0.1 |
+|------|------------------|-----------------|----------------|
+| **必要額（両サイド）** | ~$7 | ~$70 | ~$700 |
+| **推奨残高** | $10以上 | $100以上 | $1,000以上 |
+| **BNB残高** | 0.005 BNB (~$3) | 0.005 BNB (~$3) | 0.01 BNB (~$6) |
 
 **⚠️ 重要**: ORDER_SIZE × ETH価格 × 2（両サイド）の残高が必要です。
 
 **例（ETH価格 $3,500の場合）:**
 - ORDER_SIZE=0.001 → 必要額: ~$7
 - ORDER_SIZE=0.01 → 必要額: ~$70
-- ORDER_SIZE=0.1 → 必要額: ~$700（残高不足の可能性大）
+- ORDER_SIZE=0.1 → 必要額: ~$700
 
 ### 確認コマンド
 
@@ -190,10 +174,9 @@ make config
 ```env
 STANDX_CHAIN=bsc              # BSC使用
 SYMBOL=ETH-USD                # 取引ペア
-ORDER_SIZE=0.1                # 注文サイズ（DUSDベース）
+ORDER_SIZE=0.001              # ⚠️ 最初は0.001で開始
 TARGET_DISTANCE_BPS=8.0       # 目標距離 8bps
 ESCAPE_THRESHOLD_BPS=3.0      # 逃げる距離 3bps
-DRY_RUN=True                  # ⚠️ 必ずTrueで開始
 ```
 
 **設定変更方法:**
@@ -208,237 +191,17 @@ nano .env
 
 **チェックリスト:**
 
-- [ ] `DRY_RUN=True` に設定
-- [ ] `ORDER_SIZE` が最小注文額以上
+- [ ] `ORDER_SIZE=0.001` に設定（最初は最小値）
 - [ ] `SYMBOL` が意図した取引ペア
 - [ ] ウォレットアドレスが正しい
 
 ---
 
-## Phase 2: DRY_RUNテスト
+## Phase 2: 本番起動（段階的）
 
-### 2.1 DRY_RUNモードとは
+### 2.1 初回起動（ORDER_SIZE=0.001）
 
-**DRY_RUN=True の動作:**
-
-- ✅ WebSocket接続・価格取得: **実行される**
-- ✅ 注文計算・ロジック: **実行される**
-- ❌ 実際の注文発注: **実行されない**
-- ✅ ログ出力: **「DRY RUN」と表示**
-
-**つまり:**
-
-実際の注文は発注せずに、ロジックの動作だけを確認できます。
-
-### 2.2 Bot起動
-
-```bash
-# Bot起動
-make up
-
-# ログ表示（別ターミナル）
-make logs
-
-# またはリアルタイム表示
-make logs -f
-```
-
-### 2.3 ログ確認項目
-
-#### ✅ 正常起動の確認
-
-```
-[INFO] Starting StandX MM Bot
-[INFO] Chain: bsc
-[INFO] Symbol: ETH-USD
-[INFO] DRY RUN MODE: True  ← 重要！
-[INFO] WebSocket connected
-[INFO] Subscribed to price channel
-[INFO] Subscribed to order channel
-```
-
-**チェックリスト:**
-
-- [ ] `DRY RUN MODE: True` が表示される
-- [ ] WebSocket接続成功
-- [ ] チャンネル購読成功
-
-#### ✅ 価格取得の確認
-
-```
-[INFO] Price update: ETH-USD mark_price=3500.00
-```
-
-**チェックリスト:**
-
-- [ ] mark_price が定期的に更新される
-- [ ] 価格が妥当な範囲（市場価格と一致）
-
-#### ✅ 注文計算の確認
-
-```
-[INFO] Target prices calculated:
-[INFO]   Buy:  3472.00 (8.0 bps below mark)
-[INFO]   Sell: 3528.00 (8.0 bps above mark)
-[DRY RUN] Would place buy order: price=3472.00, size=0.1
-[DRY RUN] Would place sell order: price=3528.00, size=0.1
-```
-
-**チェックリスト:**
-
-- [ ] Buy/Sell価格が計算されている
-- [ ] 距離が `TARGET_DISTANCE_BPS` (8bps) になっている
-- [ ] `[DRY RUN]` 表示がある（実注文なし）
-
-#### ✅ 約定回避ロジックの確認
-
-価格が注文に接近した場合:
-
-```
-[INFO] Price approaching buy order: distance=2.5 bps
-[INFO] Escape threshold (3.0 bps) reached
-[DRY RUN] Would cancel buy order: order_id=xxx
-[DRY RUN] Would place new buy order: price=3447.50 (15.0 bps below)
-```
-
-**チェックリスト:**
-
-- [ ] 接近検知が動作
-- [ ] `ESCAPE_THRESHOLD_BPS` (3bps) で反応
-- [ ] 逃げ先が `OUTER_ESCAPE_DISTANCE_BPS` (15bps)
-
-### 2.4 動作確認チェックリスト
-
-**Phase 2 完了基準:**
-
-- [ ] Bot起動に成功（エラーなし）
-- [ ] `DRY RUN MODE: True` 表示確認
-- [ ] WebSocket接続・価格取得成功
-- [ ] Buy/Sell注文計算が正しい
-- [ ] 距離計算が正しい（8bps前後）
-- [ ] 約定回避ロジックが動作
-- [ ] エラーログがない
-
-**⚠️ エラーがある場合:**
-
-Phase 3 に進まず、[トラブルシューティング](#トラブルシューティング) を参照してください。
-
-### 2.5 DRY_RUNテスト終了
-
-```bash
-# Bot停止
-make down
-
-# または Ctrl+C
-```
-
----
-
-## Phase 2.5: 小額本番テスト
-
-### 🎯 Phase 2.5の目的
-
-**DRY_RUNでは検証できない部分をテスト:**
-
-Phase 2のDRY_RUNテストでは、実際の注文は発注されません。そのため、以下が未検証のままです：
-
-- ❌ 実際のAPI認証（JWT署名）
-- ❌ 注文発注の成否
-- ❌ 残高チェックの動作
-- ❌ 注文キャンセルの動作
-- ❌ エラーハンドリングの検証
-- ❌ レート制限への対応
-
-**Phase 2.5で検証:**
-
-- ✅ 最小ORDER_SIZE（0.001）で実注文
-- ✅ 実際のAPI動作確認
-- ✅ リスク最小化（必要額 ~$7のみ）
-- ✅ 約定しない安全な価格設定
-
-### ⚠️ 重要な注意事項
-
-**Phase 2.5は実際の注文を発注します:**
-
-- 実際の資金がロックされます（両サイド ~$7）
-- 約定リスクはほぼゼロですが、完全ではありません
-- テスト中は常にログを監視してください
-- 問題があれば即座に停止してください
-
-**Phase 2が完了していることが前提:**
-
-- DRY_RUNテストが完全に成功している
-- すべてのチェックリストが完了している
-- ログにエラーがない
-
-### 2.5.1 設定変更
-
-#### ステップ1: Bot停止
-
-現在DRY_RUNモードで起動している場合は停止:
-
-```bash
-make down
-```
-
-#### ステップ2: ORDER_SIZE変更
-
-`.env` ファイルを編集:
-
-```bash
-vim .env
-```
-
-**変更箇所:**
-
-```diff
-- ORDER_SIZE=0.1
-+ ORDER_SIZE=0.001  # 最小値
-```
-
-#### ステップ3: DRY_RUN無効化
-
-同じく `.env` で:
-
-```diff
-- DRY_RUN=True
-+ DRY_RUN=False  # 本番モード
-```
-
-**保存・確認:**
-
-```bash
-# 設定確認
-make config
-
-# 期待される出力:
-# ORDER_SIZE=0.001
-# DRY_RUN=False
-```
-
-### 2.5.2 残高確認
-
-**必要残高の確認:**
-
-```bash
-make balance
-```
-
-**必要額（ETH価格$3,500想定）:**
-- ORDER_SIZE: 0.001 ETH
-- 片側: 0.001 × $3,500 = $3.5
-- 両サイド: $3.5 × 2 = **$7**
-- 推奨残高: **$10以上**
-
-**チェックリスト:**
-
-- [ ] StandX Equity が $10以上
-- [ ] Available が $10以上
-- [ ] Locked が $0
-- [ ] Position が 0
-- [ ] BNB残高が 0.003以上
-
-### 2.5.3 小額本番テスト実行
+**リスク最小（~$7）で実際の動作を確認**
 
 #### Bot起動
 
@@ -456,8 +219,7 @@ make logs -f
 [INFO] Starting StandX MM Bot
 [INFO] Chain: bsc
 [INFO] Symbol: ETH-USD
-[INFO] Order size: 0.001
-[INFO] DRY RUN MODE: False  ← 本番モード確認！
+[INFO] Order size: 0.001  ← 最小値確認
 [INFO] WebSocket connected
 [INFO] Placing initial orders...
 [INFO] Buy order placed: order_id=xxx, price=3472.00, size=0.001
@@ -466,13 +228,12 @@ make logs -f
 
 **チェックリスト:**
 
-- [ ] `DRY RUN MODE: False` 表示
 - [ ] `Order size: 0.001` 表示
 - [ ] 両サイド注文が発注された
 - [ ] order_id が返ってきた
 - [ ] エラーがない
 
-### 2.5.4 注文状態の確認
+#### 注文状態の確認
 
 **別ターミナルで確認:**
 
@@ -491,15 +252,6 @@ docker compose run --rm bot python scripts/read_api.py status
 │ yyy      │ SELL │ 3528.0 │ 0.001 │ OPEN   │
 ╰──────────┴──────┴────────┴───────┴────────╯
 
-💰 StandX Exchange Balance
-╭─────────────────────────────┬────────╮
-│ Field                       │  Value │
-├─────────────────────────────┼────────┤
-│ Equity (資産額)             │ $10.00 │
-│ Available (利用可能額)      │  $3.00 │  ← ロックされた
-│ Locked (ロック額)           │  $7.00 │  ← 両サイド注文
-╰─────────────────────────────┴────────╯
-
 📈 Position
 ╭──────────┬──────────╮
 │ Position │      0.0 │  ← ゼロであること
@@ -511,14 +263,13 @@ docker compose run --rm bot python scripts/read_api.py status
 - [ ] 両サイド（BUY/SELL）の注文が存在
 - [ ] Size が 0.001
 - [ ] Status が OPEN
-- [ ] Locked が ~$7
 - [ ] Position が 0
 
-### 2.5.5 動作確認（5-10分監視）
+### 2.2 動作確認（1時間監視）
 
-#### ✅ 正常動作の確認
+**最低1時間は動作を監視してください。**
 
-**ログで確認すべき項目:**
+#### ログで確認すべき項目
 
 1. **価格更新**
    ```
@@ -540,11 +291,12 @@ docker compose run --rm bot python scripts/read_api.py status
 
 **チェックリスト:**
 
-- [ ] 5-10分間エラーなく動作
+- [ ] 1時間エラーなく動作
 - [ ] 価格が定期的に更新される
 - [ ] 距離が10bps以内に維持される
 - [ ] 価格変動時に適切に再配置される
 - [ ] Position が常に 0
+- [ ] 約定しなかった
 
 #### ⚠️ 異常検知
 
@@ -556,6 +308,7 @@ docker compose run --rm bot python scripts/read_api.py status
    [INFO] Position: 0.001  ← ゼロでない！
    ```
    → 即座に `make down` で停止
+   → StandX UIで成行クローズ
 
 2. **エラー頻発**
    ```
@@ -570,121 +323,17 @@ docker compose run --rm bot python scripts/read_api.py status
    ```
    → 即座に停止
 
-### 2.5.6 テスト終了
+### 2.3 ORDER_SIZE増加（0.01）
 
-**5-10分正常動作したらテスト成功:**
+**1時間正常動作したら、ORDER_SIZEを増やす:**
+
+#### ステップ1: Bot停止
 
 ```bash
-# Bot停止
 make down
 ```
 
-**終了後の確認:**
-
-```bash
-# 注文がすべてキャンセルされたか確認
-docker compose run --rm bot python scripts/read_api.py status
-
-# 期待される出力:
-# Open Orders: 0件
-# Position: 0
-# Locked: $0
-```
-
-### 2.5.7 Phase 2.5 完了基準
-
-**すべて満たすこと:**
-
-- [ ] ORDER_SIZE=0.001で起動成功
-- [ ] 実際の注文が発注された
-- [ ] 両サイド注文がOPENになった
-- [ ] 5-10分間エラーなく動作
-- [ ] 約定しなかった
-- [ ] Position = 0 を維持
-- [ ] ログにエラーがない
-- [ ] テスト終了後、注文が全てキャンセルされた
-
-**⚠️ 1つでも失敗した場合:**
-
-Phase 3に進まず、原因を調査・修正してください。
-
-### 2.5.8 Phase 2.5の意義
-
-**Phase 2.5で検証できたこと:**
-
-- ✅ 実際のAPI認証が動作する
-- ✅ 注文発注・キャンセルが成功する
-- ✅ 残高チェックが正しく動作する
-- ✅ エラーハンドリングが機能する
-- ✅ 約定回避ロジックが実環境で動作する
-
-**次のPhase 3で変わること:**
-
-- ORDER_SIZE: 0.001 → 0.01（10倍）
-- リスク: $7 → $70（10倍）
-- ロジックは同じ（Phase 2.5で検証済み）
-
----
-
-## Phase 3: 本番起動
-
-### ⚠️ 警告
-
-**本番起動前の最終確認:**
-
-- Phase 2のDRY_RUNテストが完全に成功していること
-- **Phase 2.5の小額本番テストが完全に成功していること** ← 重要！
-- 全てのチェックリストが完了していること
-- 残高が十分にあること
-
-### 3.1 最終チェックリスト
-
-**前提条件:**
-
-- [ ] Phase 2（DRY_RUN）が成功
-- [ ] Phase 2.5（小額本番テスト）が成功
-- [ ] ORDER_SIZE=0.001 で問題なく動作した
-- [ ] 実際の注文発注・キャンセルが成功した
-
-**設定確認:**
-
-- [ ] ORDER_SIZEを本番値に設定（推奨: 0.01-0.02）
-- [ ] 残高が十分（必要額の1.5倍以上推奨）
-- [ ] 建玉がゼロ
-- [ ] Lockedがゼロ（全注文キャンセル済み）
-
-**リスク理解:**
-
-- [ ] 約定リスクを理解している
-- [ ] 急激な価格変動時は約定する可能性がある
-- [ ] 緊急停止方法を理解している
-- [ ] Phase 2.5で動作を十分に理解した
-
-**残高確認:**
-
-```bash
-make balance
-```
-
-**必要残高（ETH価格$3,500想定）:**
-
-| ORDER_SIZE | 必要額（両サイド） | 推奨残高 |
-|------------|-------------------|----------|
-| 0.01 | $70 | $100以上 |
-| 0.02 | $140 | $200以上 |
-
-**期待される残高:**
-
-```
-Equity: 必要額の1.5倍以上
-Available: 必要額以上
-Locked: $0
-Position: 0
-```
-
-### 3.2 ORDER_SIZE設定
-
-**Phase 2.5で0.001を使っていたので、本番値に変更:**
+#### ステップ2: ORDER_SIZE変更
 
 `.env` ファイルを編集:
 
@@ -696,138 +345,71 @@ vim .env
 
 ```diff
 - ORDER_SIZE=0.001
-+ ORDER_SIZE=0.01  # 推奨値
++ ORDER_SIZE=0.01  # 10倍
 ```
 
-**⚠️ 注意**: DRY_RUNは既にFalseのはず（Phase 2.5で変更済み）
+#### ステップ3: 残高確認
 
-**保存・確認:**
+**必要額（ETH価格$3,500想定）:**
+- ORDER_SIZE: 0.01 ETH
+- 片側: 0.01 × $3,500 = $35
+- 両サイド: $35 × 2 = **$70**
+- 推奨残高: **$100以上**
 
 ```bash
-# 設定確認
-make config
-
-# 期待される出力:
-# ORDER_SIZE=0.01
-# DRY_RUN=False
+make balance
 ```
 
-### 3.3 本番起動
+**チェックリスト:**
+
+- [ ] StandX Equity が $100以上
+- [ ] Available が $70以上
+- [ ] Position が 0
+
+#### ステップ4: 再起動
 
 ```bash
-# Bot起動
+# Bot再起動
 make up
 
-# ログ監視（必須！）
+# ログ監視
 make logs -f
 ```
 
-### 3.4 初期監視（最初の1時間）
-
-#### ✅ 起動直後の確認
+**確認:**
 
 ```
-[INFO] Starting StandX MM Bot
-[INFO] DRY RUN MODE: False  ← 本番モード確認
-[INFO] WebSocket connected
-[INFO] Placing initial orders...
-[INFO] Buy order placed: order_id=xxx, price=3472.00
-[INFO] Sell order placed: order_id=xxx, price=3528.00
+[INFO] Order size: 0.01  ← 増加確認
+[INFO] Buy order placed: size=0.01
+[INFO] Sell order placed: size=0.01
 ```
 
-**チェックリスト:**
+### 2.4 安定稼働
 
-- [ ] `DRY RUN MODE: False` 表示
-- [ ] 初回注文が発注された
-- [ ] order_id が返ってきた
-- [ ] エラーがない
+**ORDER_SIZE=0.01で1日動作確認:**
 
-#### ✅ 注文状態の確認
+- [ ] 24時間エラーなく動作
+- [ ] 約定回数が少ない（週1回以下）
+- [ ] Position = 0 を維持
+- [ ] Maker Points/Uptimeが貯まっている
 
-```bash
-# 別ターミナルで確認
-docker compose run --rm bot python scripts/read_api.py status
-```
+**さらに増やす（オプション）:**
 
-**期待される出力:**
+安定稼働が確認できたら、ORDER_SIZEをさらに増やせます：
+- 0.01 → 0.02
+- 0.02 → 0.05
+- 0.05 → 0.1
 
-```
-📊 Open Orders
-╭──────────┬──────┬────────┬──────────┬────────╮
-│ Order ID │ Side │  Price │     Size │ Status │
-├──────────┼──────┼────────┼──────────┼────────┤
-│ xxx      │ BUY  │ 3472.0 │      0.1 │ OPEN   │
-│ yyy      │ SELL │ 3528.0 │      0.1 │ OPEN   │
-╰──────────┴──────┴────────┴──────────┴────────╯
-
-📈 Position
-╭──────────┬──────────╮
-│ Position │      0.0 │  ← ゼロであること
-╰──────────┴──────────╯
-```
-
-**チェックリスト:**
-
-- [ ] 両サイド（BUY/SELL）の注文が存在
-- [ ] Status が OPEN
-- [ ] Position が 0
-
-#### ⚠️ 異常検知項目
-
-**即座に停止すべき状況:**
-
-1. **Position が 0 でない**
-   ```
-   Position: 0.5  ← 約定した！
-   ```
-   → 即座に `make down` で停止
-
-2. **注文が片方しかない**
-   ```
-   Open Orders: 1件（BUYのみ）
-   ```
-   → 何らかのエラー、要調査
-
-3. **距離が10bpsを超える**
-   ```
-   Buy: 3440.0 (17 bps below)
-   ```
-   → Maker Uptimeポイント対象外
-
-4. **大量のエラーログ**
-   ```
-   [ERROR] API request failed
-   [ERROR] Order placement failed
-   ```
-   → 即座に停止
-
-### 3.5 緊急停止方法
-
-**何か問題があれば即座に停止:**
-
-```bash
-# Bot停止
-make down
-
-# または実行中のターミナルで
-Ctrl + C
-```
-
-**停止後の確認:**
-
-```bash
-# 注文状態確認
-docker compose run --rm bot python scripts/read_api.py status
-
-# 建玉があればクローズ（手動）
-# StandX UIで成行クローズ
-```
+**ただし:**
+- 必ず残高を確認
+- 段階的に増やす
+- 各段階で動作確認
 
 ---
 
-## Phase 4: 監視・運用
+## Phase 3: 監視・運用
 
-### 4.1 ログ監視
+### 3.1 ログ監視
 
 #### リアルタイム監視
 
@@ -848,7 +430,7 @@ make logs | grep "mark_price"
 make logs | grep "order"
 ```
 
-### 4.2 定期チェック項目
+### 3.2 定期チェック項目
 
 #### 1時間ごと
 
@@ -891,7 +473,7 @@ docker compose logs --tail=100 bot | wc -l
 make down && make up
 ```
 
-### 4.3 Maker Points確認
+### 3.3 Maker Points確認
 
 StandX UIで確認:
 
@@ -903,25 +485,27 @@ StandX UIで確認:
 1. https://standx.com にアクセス
 2. Pointsページで確認
 
-### 4.4 パフォーマンス指標
+### 3.4 緊急停止方法
 
-#### 理想的な状態
+**何か問題があれば即座に停止:**
 
-- **Uptime**: 99%以上（空白時間ゼロ）
-- **約定回数**: 0回（完全回避）
-- **10bps維持率**: 100%
+```bash
+# Bot停止
+make down
 
-#### 許容範囲
+# または実行中のターミナルで
+Ctrl + C
+```
 
-- **Uptime**: 95%以上
-- **約定回数**: 週1回以下（急変時のみ）
-- **10bps維持率**: 98%以上
+**停止後の確認:**
 
-#### 問題状態
+```bash
+# 注文状態確認
+docker compose run --rm bot python scripts/read_api.py status
 
-- **Uptime**: 90%未満 → 再配置ロジック要確認
-- **約定回数**: 週2回以上 → パラメータ調整必要
-- **10bps維持率**: 95%未満 → 距離計算要確認
+# 建玉があればクローズ（手動）
+# StandX UIで成行クローズ
+```
 
 ---
 
@@ -995,7 +579,7 @@ make balance
 **ログ:**
 ```
 [INFO] Order filled: order_id=xxx, side=BUY
-[INFO] Position: 0.5
+[INFO] Position: 0.001
 ```
 
 **対処:**
@@ -1034,98 +618,37 @@ make balance
 
 ---
 
-#### 問題6: 距離が10bpsを超える
-
-**ログ:**
-```
-[INFO] Buy: 3440.0 (17 bps below mark)
-```
-
-**原因:**
-- `TARGET_DISTANCE_BPS` 設定ミス
-- 価格変動が大きすぎる
-
-**解決方法:**
-```bash
-# 設定確認
-make config | grep TARGET_DISTANCE_BPS
-
-# .env修正
-vim .env
-# TARGET_DISTANCE_BPS=8.0 に設定
-
-# 再起動
-make down && make up
-```
-
----
-
-### ログの読み方
-
-#### INFO ログ
-
-```
-[INFO] Price update: ETH-USD mark_price=3500.00
-```
-
-- 通常の動作ログ
-- 問題なし
-
-#### WARNING ログ
-
-```
-[WARNING] Price approaching order: distance=2.5 bps
-```
-
-- 注意が必要な状況
-- ロジックが正常に反応している
-
-#### ERROR ログ
-
-```
-[ERROR] API request failed: 500 Internal Server Error
-```
-
-- エラー発生
-- 要対応
-
-**対応優先度:**
-
-1. **Position関連エラー** → 最優先、即停止
-2. **API接続エラー** → 再起動で解決する場合が多い
-3. **設定エラー** → `.env` 確認
-
----
-
 ## FAQ
 
-### Q1: DRY_RUNモードでどのくらいテストすべきですか？
+### Q1: 最初はどのくらいのORDER_SIZEで始めるべきですか？
 
-**A:** 最低でも以下を確認してください：
+**A:** 必ず **ORDER_SIZE=0.001** から開始してください。
 
-- 30分以上の連続稼働
-- 価格変動時の約定回避動作
-- エラーがないこと
+理由：
+- リスク最小（~$7のロック）
+- 実際のAPIを検証できる
+- 約定しても損失は数セント
 
-### Q2: 本番モードで約定した場合、どうすればいいですか？
+### Q2: ORDER_SIZEはどのくらいまで増やせますか？
+
+**A:** 残高に応じて段階的に：
+
+| 残高 | 推奨ORDER_SIZE |
+|------|---------------|
+| $10-50 | 0.001 |
+| $100-500 | 0.01-0.02 |
+| $1,000以上 | 0.05-0.1 |
+
+**重要:** ORDER_SIZE × 価格 × 2 の残高が必要
+
+### Q3: 約定した場合、どうすればいいですか？
 
 **A:** 以下の手順で対応：
 
 1. `make down` で即停止
 2. StandX UIで成行クローズ（建玉ゼロに）
 3. パラメータ見直し
-4. DRY_RUNで再テスト
-
-### Q3: ORDER_SIZEはどのくらいが適切ですか？
-
-**A:** 以下を目安に：
-
-- **最小**: 取引所の最小注文額以上
-- **推奨**: 残高の10-20%
-- **最大**: 残高の50%以下
-
-例: 残高100 DUSDの場合
-- 推奨 ORDER_SIZE: 0.5-1.0
+4. ORDER_SIZE=0.001で再テスト
 
 ### Q4: ガス代（BNB）はどのくらい必要ですか？
 
@@ -1152,22 +675,6 @@ make down && make up
 - 残高管理が複雑になる
 - まずは1シンボルで安定稼働させることを推奨
 
-### Q7: スリッページで約定することはありますか？
-
-**A:** 指値注文なので、スリッページはありません：
-
-- 指定価格でのみ約定
-- 不利な価格では約定しない
-- ただし、急激な価格変動で逃げ遅れる可能性はある
-
-### Q8: Maker Pointsはいつ反映されますか？
-
-**A:** StandXの仕様に依存：
-
-- リアルタイムではない
-- 数時間〜1日程度の遅延
-- StandX UIで確認可能
-
 ---
 
 ## まとめ
@@ -1178,20 +685,20 @@ make down && make up
 ✅ Phase 1: 環境準備
   → DUSD入金、設定確認
 
-✅ Phase 2: DRY_RUNテスト
-  → 実注文なしで動作確認
+✅ Phase 2: 本番起動（段階的）
+  ├─ ORDER_SIZE=0.001で開始（リスク最小）
+  ├─ 1時間動作確認
+  ├─ ORDER_SIZE=0.01に増やす
+  └─ 安定稼働
 
-✅ Phase 3: 本番起動
-  → 慎重に本番開始
-
-✅ Phase 4: 監視・運用
+✅ Phase 3: 監視・運用
   → 定期チェック、異常検知
 ```
 
 ### 重要な原則
 
-1. **必ずDRY_RUNから開始**
-2. **少額からテスト**
+1. **最初は小さく始める**（ORDER_SIZE=0.001）
+2. **段階的に増やす**（0.001 → 0.01 → 0.05）
 3. **定期的な監視**
 4. **異常時は即停止**
 
