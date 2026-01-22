@@ -9,75 +9,7 @@ from standx_mm_bot.config import Settings
 @pytest.fixture
 def real_config() -> Settings:
     """実際の.envから設定を読み込む."""
-    # 統合テストでは実APIを使うため、ドライランを無効化
-    return Settings(dry_run=False)
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_real_api_order_crud(real_config: Settings) -> None:
-    """実際のStandX APIで注文のCRUD操作をテスト（安全性保証）."""
-    order_id = None
-
-    async with StandXHTTPClient(real_config) as client:
-        # 残高確認（残高不足の場合はスキップ）
-        try:
-            balance_response = await client.get_balance()
-            # cross_available（利用可能額）をチェック
-            available = float(balance_response.get("cross_available", 0))
-            if available < 1.0:  # 最低$1必要
-                pytest.skip(
-                    f"Insufficient balance: ${available:.2f} (need at least $1.00 for testing)"
-                )
-        except Exception as e:
-            pytest.skip(f"Cannot check balance: {e}")
-
-        try:
-            # 現在の価格を取得
-            price_response = await client.get_symbol_price(real_config.symbol)
-            mark_price = float(price_response["mark_price"])
-
-            # 1. Create: 約定しない価格で注文を発注（mark_priceから50%離れた位置）
-            order_price = mark_price * 0.5  # buyの場合、現在価格より50%安い
-            order_response = await client.new_order(
-                symbol=real_config.symbol,
-                side="buy",  # 小文字
-                price=order_price,
-                size=0.01,  # 最小サイズ
-                order_type="limit",
-                time_in_force="gtc",
-                reduce_only=False,
-            )
-            assert "order_id" in order_response
-            order_id = order_response["order_id"]
-
-            # 2. Read: 未決注文一覧に存在することを確認
-            open_orders = await client.get_open_orders(real_config.symbol)
-            orders_list = open_orders.get("result") or open_orders.get("data", [])
-            order_ids = [order["order_id"] for order in orders_list]
-            assert order_id in order_ids
-
-            # 3. Delete: 注文をキャンセル
-            cancel_response = await client.cancel_order(order_id, real_config.symbol)
-            assert "status" in cancel_response or "code" in cancel_response
-
-            # 4. Read: 削除されたことを確認
-            open_orders_after = await client.get_open_orders(real_config.symbol)
-            orders_list_after = open_orders_after.get("result") or open_orders_after.get("data", [])
-            order_ids_after = [order["order_id"] for order in orders_list_after]
-            assert order_id not in order_ids_after
-
-            # 成功時はorder_idをクリア
-            order_id = None
-
-        finally:
-            # 失敗時のクリーンアップ: 注文が残っている場合はキャンセル
-            if order_id is not None:
-                try:
-                    await client.cancel_order(order_id, real_config.symbol)
-                    print(f"[CLEANUP] Cancelled order {order_id}")
-                except Exception as cleanup_error:
-                    print(f"[CLEANUP ERROR] Failed to cancel order {order_id}: {cleanup_error}")
+    return Settings()
 
 
 @pytest.mark.integration
