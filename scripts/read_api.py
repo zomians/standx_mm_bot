@@ -30,6 +30,9 @@ BSC_RPC_URL = "https://bsc-dataseed.binance.org/"
 # USDC Contract Address (BSC mainnet - Binance-Peg BSC-USD)
 BSC_USDC_CONTRACT = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
 
+# USDT Contract Address (BSC mainnet - Binance-Peg BSC-USDT)
+BSC_USDT_CONTRACT = "0x55d398326f99059fF775485246999027B3197955"
+
 
 async def get_price(client: StandXHTTPClient, symbol: str) -> None:
     """価格情報を取得して表示."""
@@ -219,7 +222,7 @@ async def get_bsc_balance(wallet_address: str) -> dict[str, Any]:
         wallet_address: ウォレットアドレス（0x形式）
 
     Returns:
-        dict: BNB残高とUSDC残高
+        dict: BNB残高、USDC残高、USDT残高
     """
     async with aiohttp.ClientSession() as session:
         # BNB残高取得
@@ -234,13 +237,13 @@ async def get_bsc_balance(wallet_address: str) -> dict[str, Any]:
             bnb_hex = bnb_result.get("result", "0x0")
             bnb_balance = int(bnb_hex, 16) / 1e18  # Wei to BNB
 
-        # USDC残高取得（ERC-20 balanceOf）
         # balanceOf(address) のシグネチャ: 0x70a08231
         balance_of_signature = "0x70a08231"
         # アドレスを32バイトにパディング
         padded_address = wallet_address[2:].zfill(64)
         data = balance_of_signature + padded_address
 
+        # USDC残高取得（ERC-20 balanceOf）
         usdc_payload = {
             "jsonrpc": "2.0",
             "id": 2,
@@ -258,9 +261,28 @@ async def get_bsc_balance(wallet_address: str) -> dict[str, Any]:
             usdc_hex = usdc_result.get("result", "0x0")
             usdc_balance = int(usdc_hex, 16) / 1e18  # USDC decimals
 
+        # USDT残高取得（ERC-20 balanceOf）
+        usdt_payload = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "eth_call",
+            "params": [
+                {
+                    "to": BSC_USDT_CONTRACT,
+                    "data": data
+                },
+                "latest"
+            ]
+        }
+        async with session.post(BSC_RPC_URL, json=usdt_payload) as response:
+            usdt_result = await response.json()
+            usdt_hex = usdt_result.get("result", "0x0")
+            usdt_balance = int(usdt_hex, 16) / 1e18  # USDT decimals
+
     return {
         "bnb": bnb_balance,
-        "usdc": usdc_balance
+        "usdc": usdc_balance,
+        "usdt": usdt_balance
     }
 
 
@@ -326,6 +348,10 @@ async def get_balance(client: StandXHTTPClient, wallet_address: str, chain: str 
 
         chain_table.add_row(native_token, f"{native_balance:.4f}")
         chain_table.add_row("USDC", f"${chain_balance['usdc']:,.2f}")
+
+        # BSCの場合はUSDTも表示
+        if chain.lower() == "bsc":
+            chain_table.add_row("USDT", f"${chain_balance['usdt']:,.2f}")
 
         console.print(chain_table)
         console.print(f"[green]✅ Balance fetched successfully[/green]")
