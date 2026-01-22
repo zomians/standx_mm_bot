@@ -17,7 +17,9 @@ class Settings(BaseSettings):
 
     # 取引設定
     symbol: str = Field("ETH-USD", description="取引ペア")
-    order_size: float = Field(0.001, description="片側注文サイズ（推奨: 最初は0.001、安定後に増やす）")
+    order_size: float = Field(
+        0.001, description="片側注文サイズ（推奨: 最初は0.001、安定後に増やす）"
+    )
 
     # 距離設定 (bps)
     target_distance_bps: float = Field(8.0, description="目標距離 (bps)")
