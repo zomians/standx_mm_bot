@@ -114,6 +114,8 @@ ESCAPE_THRESHOLD_BPS=3        # この距離まで近づいたら逃げる
 
 ### 3. 起動
 
+**⚠️ 重要: 初めて起動する場合は、必ず [TESTING.md](./TESTING.md) の手順に従ってテストしてください。**
+
 ```bash
 # Bot 起動
 make up
@@ -125,7 +127,18 @@ make logs
 make down
 ```
 
-### 4. シンボル切り替え（オプション）
+### 4. テスト・運用ガイド
+
+本番環境で起動する前に、安全なテスト手順を実施してください。
+
+詳細は **[TESTING.md](./TESTING.md)** を参照：
+
+- Phase 1: 環境準備（DUSD入金）
+- Phase 2: DRY_RUNテスト
+- Phase 3: 本番起動
+- Phase 4: 監視・運用
+
+### 5. シンボル切り替え（オプション）
 
 ETH-USDとBTC-USDを簡単に切り替えできます。
 
