@@ -121,11 +121,11 @@ up-eth: switch-eth up
 # BTC-USDで起動
 up-btc: switch-btc up
 
-# 現在の設定確認（秘密鍵・アドレスは表示しない）
+# 現在の設定確認（秘密鍵は表示しない）
 config:
 	@echo "=== Current Configuration ==="
 	@if [ -f .env ]; then \
-		cat .env | grep -v "PRIVATE_KEY\|WALLET_ADDRESS" | grep -v "^#" | grep -v "^$$"; \
+		cat .env | grep -v "KEY" | grep -v "^#" | grep -v "^$$"; \
 	else \
 		echo "Error: .env file not found"; \
 	fi
