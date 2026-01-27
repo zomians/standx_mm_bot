@@ -43,7 +43,7 @@ def test_settings_default_values() -> None:
     # デフォルト値の確認
     assert settings.standx_chain == "bsc"
     assert settings.symbol == "ETH-USD"
-    assert settings.order_size == 0.1
+    assert settings.order_size == 0.001
     assert settings.target_distance_bps == 8.0
     assert settings.escape_threshold_bps == 3.0
     assert settings.outer_escape_distance_bps == 15.0

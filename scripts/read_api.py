@@ -401,9 +401,6 @@ async def main() -> None:
         # 設定読み込み
         config = Settings()
 
-        # dry_runを無効化（実際のAPIから読み取る）
-        config.dry_run = False
-
         async with StandXHTTPClient(config) as client:
             if command == "price":
                 await get_price(client, config.symbol)
