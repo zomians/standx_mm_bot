@@ -263,7 +263,7 @@ class StandXHTTPClient:
             price: 注文価格
             size: 注文サイズ
             order_type: 注文タイプ (limit/market、小文字)
-            time_in_force: 注文有効期限 (gtc/ioc/fok)
+            time_in_force: 注文有効期限 (gtc/ioc/alo)
             reduce_only: ポジション縮小のみフラグ
 
         Returns:
